@@ -182,9 +182,9 @@ function ScanPageContent() {
       {/* QR Code Generator */}
       <Card>
         <CardHeader>
-          <CardTitle>Generate QR Label</CardTitle>
+          <CardTitle>Print QR Labels</CardTitle>
           <CardDescription>
-            Create a printable QR code label for a spool. Scan with your phone camera to quickly assign to an AMS tray.
+            Print QR code labels for any paper or label size. Select multiple spools and customize the layout.
           </CardDescription>
         </CardHeader>
         <CardContent>
