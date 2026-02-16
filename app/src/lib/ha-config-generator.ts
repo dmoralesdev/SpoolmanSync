@@ -503,7 +503,7 @@ utility_meter:
   spoolmansync_filament_usage_meter:
     unique_id: spoolmansync-filament-usage-meter
     source: sensor.spoolmansync_filament_usage
-    cycle: weekly
+    cycle: none
 
 # REST commands to send updates to SpoolmanSync webhook
 rest_command:
