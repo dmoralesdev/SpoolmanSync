@@ -43,11 +43,18 @@ const humidityTestCases: TestCase[] = [
   { name: 'A1 AMS Lite French', entityId: 'sensor.a1_ams_lite_indice_d_humidite', expected: 'lite' },
   { name: 'A1 Mini no number German', entityId: 'sensor.a1_mini_ams_luftfeuchtigkeit', expected: '1' },
 
-  // AMS 2 Pro (P2S) - "_pro" suffix after number
+  // AMS 2 Pro (P2S) - "_pro" suffix after number (number-first)
   { name: 'P2S AMS Pro English', entityId: 'sensor.bambu_lab_ams_2_pro_humidity', expected: '2' },
   { name: 'P2S AMS Pro German', entityId: 'sensor.bambu_lab_ams_2_pro_luftfeuchtigkeit', expected: '2' },
   { name: 'P2S AMS Pro Dutch', entityId: 'sensor.p2s_printer_ams_1_pro_luchtvochtigheid', expected: '1' },
   { name: 'P2S AMS Pro Spanish', entityId: 'sensor.my_p2s_ams_3_pro_humedad', expected: '3' },
+
+  // AMS Pro 2 - type-first ordering (seen in Danish locale, GitHub Issue #18)
+  { name: 'AMS Pro type-first Danish', entityId: 'sensor.p1s_ams_pro_2_fugtighed', expected: '2' },
+  { name: 'AMS Pro type-first Danish index', entityId: 'sensor.p1s_ams_pro_2_fugtighedsindeks', expected: '2' },
+  { name: 'AMS Pro type-first English', entityId: 'sensor.p1s_ams_pro_2_humidity', expected: '2' },
+  { name: 'AMS Pro type-first German', entityId: 'sensor.bambu_lab_ams_pro_1_luftfeuchtigkeit', expected: '1' },
+  { name: 'No prefix - ams_pro_2_humidity', entityId: 'sensor.ams_pro_2_humidity', expected: '2' },
 
   // AMS HT - uses index 128 or standalone "ht"
   { name: 'AMS HT with 128', entityId: 'sensor.a1_mini_ams_128_humidity', expected: '128' },
@@ -88,10 +95,17 @@ const trayTestCases: TrayTestCase[] = [
   { name: 'A1 AMS Lite with "lite"', entityId: 'sensor.a1_mini_ams_lite_tray_3', expected: { amsNumber: 'lite', trayNumber: 3 } },
   { name: 'A1 AMS Lite slot naming', entityId: 'sensor.a1_ams_slot_2', expected: { amsNumber: '1', trayNumber: 2 } },
 
-  // AMS 2 Pro (P2S) - "_pro" suffix after number
+  // AMS 2 Pro (P2S) - "_pro" suffix after number (number-first)
   { name: 'P2S AMS Pro Tray 1', entityId: 'sensor.bambu_lab_ams_2_pro_tray_1', expected: { amsNumber: '2', trayNumber: 1 } },
   { name: 'P2S AMS Pro Slot German', entityId: 'sensor.bambu_lab_ams_2_pro_slot_3', expected: { amsNumber: '2', trayNumber: 3 } },
   { name: 'P2S AMS Pro Tray 4', entityId: 'sensor.p2s_ams_1_pro_tray_4', expected: { amsNumber: '1', trayNumber: 4 } },
+
+  // AMS Pro 2 - type-first ordering (seen in Danish locale, GitHub Issue #18)
+  { name: 'AMS Pro type-first Danish bakke', entityId: 'sensor.p1s_ams_pro_2_bakke_1', expected: { amsNumber: '2', trayNumber: 1 } },
+  { name: 'AMS Pro type-first Danish bakke 4', entityId: 'sensor.p1s_ams_pro_2_bakke_4', expected: { amsNumber: '2', trayNumber: 4 } },
+  { name: 'AMS Pro type-first English', entityId: 'sensor.p1s_ams_pro_2_tray_2', expected: { amsNumber: '2', trayNumber: 2 } },
+  { name: 'AMS Pro type-first German', entityId: 'sensor.bambu_lab_ams_pro_1_slot_3', expected: { amsNumber: '1', trayNumber: 3 } },
+  { name: 'No prefix - ams_pro_2_tray_1', entityId: 'sensor.ams_pro_2_tray_1', expected: { amsNumber: '2', trayNumber: 1 } },
 
   // AMS HT - uses index 128 or standalone "ht"
   { name: 'AMS HT with 128 Tray 1', entityId: 'sensor.a1_mini_ams_128_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
@@ -128,7 +142,8 @@ interface BuildPatternTestCase {
 
 const buildAmsPatternTestCases: BuildPatternTestCase[] = [
   { name: 'Standard AMS match', prefix: 'x1c_00m09d462101575', entityId: 'sensor.x1c_00m09d462101575_ams_1_humidity', shouldMatch: true, expectedAmsNumber: '1' },
-  { name: 'AMS Pro match', prefix: 'bambu_lab', entityId: 'sensor.bambu_lab_ams_2_pro_humidity', shouldMatch: true, expectedAmsNumber: '2' },
+  { name: 'AMS Pro number-first match', prefix: 'bambu_lab', entityId: 'sensor.bambu_lab_ams_2_pro_humidity', shouldMatch: true, expectedAmsNumber: '2' },
+  { name: 'AMS Pro type-first match', prefix: 'p1s', entityId: 'sensor.p1s_ams_pro_2_fugtighed', shouldMatch: true, expectedAmsNumber: '2' },
   { name: 'AMS HT 128 match', prefix: 'a1_mini', entityId: 'sensor.a1_mini_ams_128_humidity', shouldMatch: true, expectedAmsNumber: '128' },
   { name: 'AMS Lite match', prefix: 'a1_mini', entityId: 'sensor.a1_mini_ams_lite_humidity', shouldMatch: true, expectedAmsNumber: 'lite' },
   { name: 'Wrong prefix no match', prefix: 'x1c', entityId: 'sensor.p1s_ams_1_humidity', shouldMatch: false },
@@ -149,7 +164,9 @@ interface BuildTrayPatternTestCase {
 
 const buildTrayPatternTestCases: BuildTrayPatternTestCase[] = [
   { name: 'Standard tray match', prefix: 'x1c', amsNumber: '1', trayNum: 1, entityId: 'sensor.x1c_ams_1_tray_1', shouldMatch: true },
-  { name: 'AMS Pro tray match', prefix: 'bambu_lab', amsNumber: '2', trayNum: 1, entityId: 'sensor.bambu_lab_ams_2_pro_tray_1', shouldMatch: true },
+  { name: 'AMS Pro number-first tray match', prefix: 'bambu_lab', amsNumber: '2', trayNum: 1, entityId: 'sensor.bambu_lab_ams_2_pro_tray_1', shouldMatch: true },
+  { name: 'AMS Pro type-first tray match', prefix: 'p1s', amsNumber: '2', trayNum: 1, entityId: 'sensor.p1s_ams_pro_2_bakke_1', shouldMatch: true },
+  { name: 'AMS Pro type-first tray 4', prefix: 'p1s', amsNumber: '2', trayNum: 4, entityId: 'sensor.p1s_ams_pro_2_bakke_4', shouldMatch: true },
   { name: 'AMS HT tray match', prefix: 'a1_mini', amsNumber: '128', trayNum: 1, entityId: 'sensor.a1_mini_ams_128_tray_1', shouldMatch: true },
   { name: 'AMS Lite no number match', prefix: 'schiller', amsNumber: '1', trayNum: 1, entityId: 'sensor.schiller_ams_tray_1', shouldMatch: true },
   { name: 'Wrong tray no match', prefix: 'x1c', amsNumber: '1', trayNum: 1, entityId: 'sensor.x1c_ams_1_tray_2', shouldMatch: false },
@@ -228,6 +245,13 @@ const multiAmsTestCases: MultiAmsTestCase[] = [
     ],
     expectedAmsNumbers: ['1', '2'],
   },
+  {
+    name: 'P1S with AMS Pro 2 type-first Danish (GitHub Issue #18)',
+    entities: [
+      'sensor.p1s_ams_pro_2_fugtighed',
+    ],
+    expectedAmsNumbers: ['2'],
+  },
 ];
 
 // =============================================================================
@@ -284,8 +308,8 @@ for (const tc of buildAmsPatternTestCases) {
     if (tc.shouldMatch) {
       if (!match) throw new Error(`Pattern should match but didn't`);
       if (tc.expectedAmsNumber) {
-        // Group 1 = number, Group 2 = "lite" or "ht"
-        const amsNum = match[1] || match[2] || '1';
+        // Group 1 = number (number-first), Group 2 = number (type-first), Group 3 = "lite" or "ht"
+        const amsNum = match[1] || match[2] || match[3] || '1';
         assertEqual(amsNum, tc.expectedAmsNumber);
       }
     } else {
@@ -396,6 +420,55 @@ for (const tc of multiAmsTestCases) {
     assertEqual(results, tc.expectedAmsNumbers);
   });
 }
+
+console.log('\n=== GitHub Issue #18 - AMS Pro 2 Type-First Ordering (Danish) ===\n');
+
+// Exact entity IDs from GitHub issue #18
+const githubIssue18Entities = [
+  'sensor.p1s_ams_pro_2_fugtighedsindeks',
+  'sensor.p1s_ams_pro_2_fugtighed',
+  'sensor.p1s_ams_pro_2_temperatur',
+  'sensor.p1s_ams_pro_2_resterende_torretid',
+  'sensor.p1s_ams_pro_2_bakke_1',
+  'sensor.p1s_ams_pro_2_bakke_2',
+  'sensor.p1s_ams_pro_2_bakke_3',
+  'sensor.p1s_ams_pro_2_bakke_4',
+];
+
+test('GitHub Issue #18: AMS Pro 2 humidity sensor (type-first)', () => {
+  const result = matchAmsHumidityEntity('sensor.p1s_ams_pro_2_fugtighed');
+  assertEqual(result, '2');
+});
+
+test('GitHub Issue #18: AMS Pro 2 humidity index (Danish)', () => {
+  const result = matchAmsHumidityEntity('sensor.p1s_ams_pro_2_fugtighedsindeks');
+  assertEqual(result, '2');
+});
+
+test('GitHub Issue #18: AMS Pro 2 tray 1 (bakke)', () => {
+  const result = matchTrayEntity('sensor.p1s_ams_pro_2_bakke_1');
+  assertEqual(result, { amsNumber: '2', trayNumber: 1 });
+});
+
+test('GitHub Issue #18: AMS Pro 2 tray 4 (bakke)', () => {
+  const result = matchTrayEntity('sensor.p1s_ams_pro_2_bakke_4');
+  assertEqual(result, { amsNumber: '2', trayNumber: 4 });
+});
+
+test('GitHub Issue #18: All 4 trays detected', () => {
+  for (let i = 1; i <= 4; i++) {
+    const trayResult = matchTrayEntity(`sensor.p1s_ams_pro_2_bakke_${i}`);
+    if (!trayResult) throw new Error(`Tray ${i} not detected`);
+    if (trayResult.amsNumber !== '2') throw new Error(`Expected AMS 2, got ${trayResult.amsNumber}`);
+    if (trayResult.trayNumber !== i) throw new Error(`Expected tray ${i}, got ${trayResult.trayNumber}`);
+  }
+});
+
+test('GitHub Issue #18: A1 AMS Lite Danish entities still work', () => {
+  assertEqual(matchAmsHumidityEntity('sensor.a1_ams_lite_fugtighed'), 'lite');
+  assertEqual(matchAmsHumidityEntity('sensor.a1_ams_lite_fugtighedsindeks'), 'lite');
+  assertEqual(matchTrayEntity('sensor.a1_ams_lite_bakke_1'), { amsNumber: 'lite', trayNumber: 1 });
+});
 
 // =============================================================================
 // Summary

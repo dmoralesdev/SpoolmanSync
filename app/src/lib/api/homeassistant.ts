@@ -767,7 +767,7 @@ export class HomeAssistantClient {
         // Try prefix-based pattern first, fall back to prefix-agnostic matchers
         // AMS number is optional in pattern - A1 with AMS Lite uses "_ams_" without a number
         const amsMatch = amsState.entity_id.match(amsPattern);
-        let amsNumber: string | null = amsMatch ? (amsMatch[1] || '1') : null;
+        let amsNumber: string | null = amsMatch ? (amsMatch[1] || amsMatch[2] || '1') : null;
         // If prefix-based didn't match, try humidity matcher
         if (!amsNumber) {
           amsNumber = matchAmsHumidityEntity(amsState.entity_id);
