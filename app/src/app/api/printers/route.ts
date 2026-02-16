@@ -28,8 +28,16 @@ interface MismatchInfo {
  * won't have printer-reported data to compare against.
  */
 function detectTrayMismatch(tray: HATray, assignedSpool: Spool): MismatchInfo | null {
+  // Skip mismatch detection for non-RFID spools. ha-bambulab reports tray_uuid
+  // as all zeros for third-party spools without RFID tags. The color/material
+  // data for these is user-configured in Bambu Studio (not from RFID), so it
+  // won't reliably match Spoolman's vendor data and would cause false warnings.
+  const uuid = tray.tray_uuid?.replace(/0/g, '') || '';
+  if (!uuid) {
+    return null;
+  }
+
   // If the tray has no material reported by printer, can't detect mismatch
-  // This happens with non-Bambu spools (no RFID) or empty trays
   const trayName = tray.name?.toLowerCase().trim() || '';
   if (!trayName || trayName === 'empty') {
     return null;
