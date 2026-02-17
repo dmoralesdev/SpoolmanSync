@@ -489,8 +489,7 @@ function generateConfigurationAdditions(
   const utilityMeterEntries = printerConfigs.map(p =>
     `  spoolmansync_${p.prefix}_filament_usage_meter:
     unique_id: spoolmansync-${p.prefix}-filament-usage-meter
-    source: sensor.spoolmansync_${p.prefix}_filament_usage
-    cycle: none`
+    source: sensor.spoolmansync_${p.prefix}_filament_usage`
   ).join('\n');
 
   // Build per-printer template sensor entries (filament usage + active tray)
