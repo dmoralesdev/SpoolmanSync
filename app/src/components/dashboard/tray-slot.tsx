@@ -17,11 +17,20 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { SpoolFilterBar } from '@/components/dashboard/spool-filter-bar';
 import type { HATray } from '@/lib/api/homeassistant';
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
+
+type SortBy = 'id' | 'name' | 'material' | 'vendor';
 
 interface MismatchInfo {
   type: 'material' | 'color' | 'both';
@@ -75,10 +84,26 @@ function getSpoolFieldValue(spool: Spool, fieldKey: string): string | null {
   }
 }
 
+function sortSpools(spools: Spool[], sortBy: SortBy): Spool[] {
+  return [...spools].sort((a, b) => {
+    switch (sortBy) {
+      case 'id':
+        return a.id - b.id;
+      case 'name':
+        return (a.filament.name || a.filament.material).localeCompare(b.filament.name || b.filament.material);
+      case 'material':
+        return (a.filament.material || '').localeCompare(b.filament.material || '');
+      case 'vendor':
+        return (a.filament.vendor?.name || '').localeCompare(b.filament.vendor?.name || '');
+    }
+  });
+}
+
 export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mismatch }: TraySlotProps) {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<Record<string, string | null>>({});
   const [enabledFields, setEnabledFields] = useState<FilterField[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>('id');
 
   // Fetch filter fields when dialog opens
   useEffect(() => {
@@ -118,9 +143,9 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
     setFilters({});
   }, []);
 
-  // Filter spools based on active filters
+  // Filter and sort spools
   const filteredSpools = useMemo(() => {
-    return spools.filter((spool) => {
+    const filtered = spools.filter((spool) => {
       for (const [key, value] of Object.entries(filters)) {
         if (value) {
           const spoolValue = getSpoolFieldValue(spool, key);
@@ -131,7 +156,8 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
       }
       return true;
     });
-  }, [spools, filters]);
+    return sortSpools(filtered, sortBy);
+  }, [spools, filters, sortBy]);
 
   const colorHex = assignedSpool?.filament.color_hex || tray.color?.replace('#', '') || 'cccccc';
   // Only show weight from Spoolman when a spool is assigned
@@ -290,14 +316,41 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
         )}
 
         <Command className="rounded-lg border shadow-md">
-          {/* Filter bar */}
-          {hasFilterOptions && (
+          {/* Filter bar with sort */}
+          {hasFilterOptions ? (
             <SpoolFilterBar
               filters={filters}
               onFilterChange={handleFilterChange}
               onClearAll={handleClearAll}
               fields={enabledFields}
+              extra={
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="id">Sort: ID</SelectItem>
+                    <SelectItem value="name">Sort: Name</SelectItem>
+                    <SelectItem value="material">Sort: Material</SelectItem>
+                    <SelectItem value="vendor">Sort: Vendor</SelectItem>
+                  </SelectContent>
+                </Select>
+              }
             />
+          ) : (
+            <div className="flex items-center justify-end border-b p-2">
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="id">Sort: ID</SelectItem>
+                  <SelectItem value="name">Sort: Name</SelectItem>
+                  <SelectItem value="material">Sort: Material</SelectItem>
+                  <SelectItem value="vendor">Sort: Vendor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           )}
           <CommandInput placeholder="Search spools by name, vendor, material, ID, or any field..." />
           <CommandList className="max-h-[300px]">

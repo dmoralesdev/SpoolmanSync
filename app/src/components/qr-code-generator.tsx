@@ -11,10 +11,25 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { SpoolFilterBar } from '@/components/dashboard/spool-filter-bar';
 import { LabelSheetSettings } from '@/components/label-sheet-settings';
 import { LabelSheetPreview } from '@/components/label-sheet-preview';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Printer, QrCode } from 'lucide-react';
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
@@ -27,6 +42,63 @@ import {
   type ContentSettings,
   type LayoutSettings,
 } from '@/lib/label-sheet-config';
+
+type SortBy = 'id' | 'name' | 'material' | 'vendor';
+
+const LABEL_CONFIG_KEY = 'spoolmansync-label-config';
+const PRINTED_SPOOLS_KEY = 'spoolmansync-printed-spools';
+
+function loadLabelConfig(): LabelSheetConfig {
+  try {
+    const stored = localStorage.getItem(LABEL_CONFIG_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        sheet: { ...DEFAULT_CONFIG.sheet, ...parsed.sheet },
+        content: { ...DEFAULT_CONFIG.content, ...parsed.content },
+        layout: { ...DEFAULT_CONFIG.layout, ...parsed.layout },
+      };
+    }
+  } catch {
+    // Corrupt or unavailable — fall through
+  }
+  return DEFAULT_CONFIG;
+}
+
+function loadPrintedSpools(): Set<number> {
+  try {
+    const stored = localStorage.getItem(PRINTED_SPOOLS_KEY);
+    if (stored) {
+      return new Set(JSON.parse(stored));
+    }
+  } catch {
+    // Corrupt or unavailable — fall through
+  }
+  return new Set();
+}
+
+function savePrintedSpools(ids: Set<number>) {
+  try {
+    localStorage.setItem(PRINTED_SPOOLS_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+function sortSpools(spools: Spool[], sortBy: SortBy): Spool[] {
+  return [...spools].sort((a, b) => {
+    switch (sortBy) {
+      case 'id':
+        return a.id - b.id;
+      case 'name':
+        return (a.filament.name || a.filament.material).localeCompare(b.filament.name || b.filament.material);
+      case 'material':
+        return (a.filament.material || '').localeCompare(b.filament.material || '');
+      case 'vendor':
+        return (a.filament.vendor?.name || '').localeCompare(b.filament.vendor?.name || '');
+    }
+  });
+}
 
 interface QRCodeGeneratorProps {
   spools: Spool[];
@@ -64,7 +136,20 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
   const [searchValue, setSearchValue] = useState('');
   const [filters, setFilters] = useState<Record<string, string | null>>({});
   const [enabledFields, setEnabledFields] = useState<FilterField[]>([]);
-  const [config, setConfig] = useState<LabelSheetConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<LabelSheetConfig>(() => loadLabelConfig());
+  const [sortBy, setSortBy] = useState<SortBy>('id');
+  const [printedSpools, setPrintedSpools] = useState<Set<number>>(() => loadPrintedSpools());
+  const [hidePrinted, setHidePrinted] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+
+  // Persist config to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(LABEL_CONFIG_KEY, JSON.stringify(config));
+    } catch {
+      // Storage full or unavailable
+    }
+  }, [config]);
 
   // Fetch filter fields on mount
   useEffect(() => {
@@ -81,9 +166,10 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
       .catch((err) => console.error('Failed to fetch filter fields:', err));
   }, []);
 
-  // Filter spools based on active filters
+  // Filter and sort spools
   const filteredSpools = useMemo(() => {
-    return spools.filter((spool) => {
+    const filtered = spools.filter((spool) => {
+      if (hidePrinted && printedSpools.has(spool.id)) return false;
       for (const [key, value] of Object.entries(filters)) {
         if (value) {
           const spoolValue = getSpoolFieldValue(spool, key);
@@ -92,7 +178,8 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
       }
       return true;
     });
-  }, [spools, filters]);
+    return sortSpools(filtered, sortBy);
+  }, [spools, filters, sortBy, hidePrinted, printedSpools]);
 
   // Config updaters
   const updateSheet = useCallback((partial: Partial<SheetSettings>) => {
@@ -153,27 +240,91 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
 
   const handlePrint = () => {
     window.print();
+    // Track printed spools
+    setPrintedSpools((prev) => {
+      const next = new Set(prev);
+      for (const id of selectedIds) {
+        next.add(id);
+      }
+      savePrintedSpools(next);
+      return next;
+    });
   };
+
+  const clearPrintedHistory = useCallback(() => {
+    setPrintedSpools(new Set());
+    savePrintedSpools(new Set());
+  }, []);
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      {enabledFields.length > 0 && (
+      {/* Filters & Sort */}
+      {enabledFields.length > 0 ? (
         <SpoolFilterBar
           filters={filters}
           onFilterChange={(key, value) => setFilters((prev) => ({ ...prev, [key]: value }))}
           onClearAll={() => setFilters({})}
           fields={enabledFields}
+          extra={
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="id">Sort: ID</SelectItem>
+                <SelectItem value="name">Sort: Name</SelectItem>
+                <SelectItem value="material">Sort: Material</SelectItem>
+                <SelectItem value="vendor">Sort: Vendor</SelectItem>
+              </SelectContent>
+            </Select>
+          }
         />
+      ) : (
+        <div className="flex items-center justify-end">
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="id">Sort: ID</SelectItem>
+              <SelectItem value="name">Sort: Name</SelectItem>
+              <SelectItem value="material">Sort: Material</SelectItem>
+              <SelectItem value="vendor">Sort: Vendor</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
       {/* Spool Selector */}
       <div className="space-y-2">
         {/* Selection toolbar */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {selectedIds.size} selected
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {selectedIds.size} selected
+            </span>
+            {printedSpools.size > 0 && (
+              <>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox
+                    checked={hidePrinted}
+                    onCheckedChange={(checked) => setHidePrinted(checked === true)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    Hide printed ({printedSpools.size})
+                  </span>
+                </label>
+                <button
+                  onClick={() => setConfirmClearOpen(true)}
+                  className="text-xs text-muted-foreground hover:text-muted-foreground/80 underline-offset-2 hover:underline"
+                  title="Clear the list of spools you've already printed QR labels for"
+                >
+                  Clear history
+                </button>
+              </>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={selectAllVisible}>
               Select All
@@ -271,6 +422,34 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
           <p className="text-sm">Select spools above to preview labels</p>
         </div>
       )}
+
+      {/* Confirmation dialog for clearing printed history */}
+      <Dialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Clear QR label print history?</DialogTitle>
+            <DialogDescription>
+              This will forget which {printedSpools.size} spool{printedSpools.size !== 1 ? 's' : ''} you&apos;ve
+              previously printed QR labels for. All spools will show as unprinted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setConfirmClearOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                clearPrintedHistory();
+                setHidePrinted(false);
+                setConfirmClearOpen(false);
+              }}
+            >
+              Clear history
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

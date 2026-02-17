@@ -13,6 +13,13 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Alert,
   AlertDescription,
   AlertTitle,
@@ -21,6 +28,8 @@ import { Nfc, CheckCircle2, XCircle, Loader2, AlertTriangle, Smartphone } from '
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
 import { buildExternalUrl } from '@/lib/ingress-path';
+
+type SortBy = 'id' | 'name' | 'material' | 'vendor';
 
 interface NFCWriterProps {
   spools: Spool[];
@@ -77,6 +86,21 @@ declare global {
   }
 }
 
+function sortSpools(spools: Spool[], sortBy: SortBy): Spool[] {
+  return [...spools].sort((a, b) => {
+    switch (sortBy) {
+      case 'id':
+        return a.id - b.id;
+      case 'name':
+        return (a.filament.name || a.filament.material).localeCompare(b.filament.name || b.filament.material);
+      case 'material':
+        return (a.filament.material || '').localeCompare(b.filament.material || '');
+      case 'vendor':
+        return (a.filament.vendor?.name || '').localeCompare(b.filament.vendor?.name || '');
+    }
+  });
+}
+
 function getSpoolFieldValue(spool: Spool, fieldKey: string): string | null {
   switch (fieldKey) {
     case 'material':
@@ -101,6 +125,7 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
   const [searchValue, setSearchValue] = useState('');
   const [filters, setFilters] = useState<Record<string, string | null>>({});
   const [enabledFields, setEnabledFields] = useState<FilterField[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>('id');
   const [nfcSupported, setNfcSupported] = useState<boolean | null>(null);
   const [writeStatus, setWriteStatus] = useState<WriteStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -125,9 +150,9 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
       .catch((err) => console.error('Failed to fetch filter fields:', err));
   }, []);
 
-  // Filter spools based on active filters
+  // Filter and sort spools
   const filteredSpools = useMemo(() => {
-    return spools.filter((spool) => {
+    const filtered = spools.filter((spool) => {
       for (const [key, value] of Object.entries(filters)) {
         if (value) {
           const spoolValue = getSpoolFieldValue(spool, key);
@@ -136,7 +161,8 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
       }
       return true;
     });
-  }, [spools, filters]);
+    return sortSpools(filtered, sortBy);
+  }, [spools, filters, sortBy]);
 
   const nfcUrl = selectedSpool
     ? buildExternalUrl(`/scan/spool/${selectedSpool.id}`, directAccessPort)
@@ -249,14 +275,41 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      {enabledFields.length > 0 && (
+      {/* Filters & Sort */}
+      {enabledFields.length > 0 ? (
         <SpoolFilterBar
           filters={filters}
           onFilterChange={handleFilterChange}
           onClearAll={handleClearFilters}
           fields={enabledFields}
+          extra={
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="id">Sort: ID</SelectItem>
+                <SelectItem value="name">Sort: Name</SelectItem>
+                <SelectItem value="material">Sort: Material</SelectItem>
+                <SelectItem value="vendor">Sort: Vendor</SelectItem>
+              </SelectContent>
+            </Select>
+          }
         />
+      ) : (
+        <div className="flex items-center justify-end">
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="id">Sort: ID</SelectItem>
+              <SelectItem value="name">Sort: Name</SelectItem>
+              <SelectItem value="material">Sort: Material</SelectItem>
+              <SelectItem value="vendor">Sort: Vendor</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
       {/* Spool Selector */}

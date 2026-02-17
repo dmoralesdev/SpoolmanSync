@@ -25,6 +25,7 @@ interface SpoolFilterBarProps {
   onFilterChange: (key: string, value: string | null) => void;
   onClearAll: () => void;
   fields: FilterField[];
+  extra?: React.ReactNode;
 }
 
 export function SpoolFilterBar({
@@ -32,6 +33,7 @@ export function SpoolFilterBar({
   onFilterChange,
   onClearAll,
   fields,
+  extra,
 }: SpoolFilterBarProps) {
   // Check if any filters are active
   const hasActiveFilters = Object.values(filters).some((v) => v !== null);
@@ -55,38 +57,42 @@ export function SpoolFilterBar({
   return (
     <div className="border-b p-2 space-y-2">
       {/* Filter dropdowns row */}
-      <div className="flex flex-wrap items-center gap-2">
-        {fieldsWithValues.map((field) => (
-          <Select
-            key={field.key}
-            value={filters[field.key] || ALL_VALUE}
-            onValueChange={(value) => onFilterChange(field.key, value === ALL_VALUE ? null : value)}
-          >
-            <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
-              <SelectValue placeholder={field.name} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VALUE}>All {field.name}</SelectItem>
-              {field.values.map((v) => (
-                <SelectItem key={v} value={v}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ))}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {fieldsWithValues.map((field) => (
+            <Select
+              key={field.key}
+              value={filters[field.key] || ALL_VALUE}
+              onValueChange={(value) => onFilterChange(field.key, value === ALL_VALUE ? null : value)}
+            >
+              <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
+                <SelectValue placeholder={field.name} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_VALUE}>All {field.name}</SelectItem>
+                {field.values.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ))}
 
-        {/* Clear all button */}
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearAll}
-            className="h-8 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Clear all
-          </Button>
-        )}
+          {/* Clear all button */}
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearAll}
+              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear all
+            </Button>
+          )}
+        </div>
+
+        {extra && <div className="flex-shrink-0">{extra}</div>}
       </div>
 
       {/* Active filter badges */}

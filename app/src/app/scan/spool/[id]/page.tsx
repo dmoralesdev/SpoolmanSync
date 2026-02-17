@@ -193,7 +193,7 @@ export default function SpoolAssignPage({
                   </div>
                   <div>
                     <span className="text-muted-foreground">Remaining:</span>
-                    <span className="ml-2 font-medium">{spool.remaining_weight}g</span>
+                    <span className="ml-2 font-medium">{Math.round(spool.remaining_weight)}g</span>
                   </div>
                 </div>
               </CardContent>
