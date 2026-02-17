@@ -272,13 +272,13 @@ export default function LogsPage() {
               </span>
             )}
           </div>
-          <Button variant="outline" onClick={() => fetchLogs(page, filter)} disabled={loading}>
+          <Button variant="outline" onClick={() => fetchLogs(page, filter)} disabled={loading} className="w-auto self-start sm:self-auto">
             {loading ? 'Loading...' : 'Refresh'}
           </Button>
         </div>
 
         {/* Filter tabs */}
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 grid grid-cols-4 sm:flex sm:flex-wrap gap-2">
           {FILTER_OPTIONS.map((option) => (
             <Button
               key={option.value}
@@ -286,6 +286,7 @@ export default function LogsPage() {
               size="sm"
               onClick={() => handleFilterChange(option.value)}
               title={option.description}
+              className="text-xs sm:text-sm"
             >
               {option.label}
             </Button>

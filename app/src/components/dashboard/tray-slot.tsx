@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -220,7 +221,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
                   className="h-8 w-8 rounded-full border-2 border-border flex-shrink-0"
                   style={{ backgroundColor: `#${colorHex}` }}
                 />
-                <p className="text-sm font-semibold leading-tight line-clamp-2" title={assignedSpool.filament.name || assignedSpool.filament.material}>
+                <p className="text-sm font-semibold leading-tight line-clamp-2 [hyphens:none]" title={assignedSpool.filament.name || assignedSpool.filament.material}>
                   {assignedSpool.filament.name || assignedSpool.filament.material}
                 </p>
               </div>
@@ -270,6 +271,9 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
           <DialogTitle>
             Assign Spool to {tray.tray_number === 0 ? 'External Slot' : `Tray ${tray.tray_number}`}
           </DialogTitle>
+          <DialogDescription>
+            Search and select a spool from your Spoolman inventory.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Mismatch warning in dialog */}
