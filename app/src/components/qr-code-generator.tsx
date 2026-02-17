@@ -300,7 +300,7 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
       {/* Spool Selector */}
       <div className="space-y-2">
         {/* Selection toolbar */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {selectedIds.size} selected
@@ -319,7 +319,7 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
                 </label>
                 <button
                   onClick={() => setConfirmClearOpen(true)}
-                  className="text-xs text-muted-foreground hover:text-muted-foreground/80 underline-offset-2 hover:underline"
+                  className="text-xs text-muted-foreground hover:text-muted-foreground/80 underline-offset-2 hover:underline whitespace-nowrap"
                   title="Clear the list of spools you've already printed QR labels for"
                 >
                   Clear history
@@ -327,12 +327,12 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
               </>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={selectAllVisible}>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={selectAllVisible}>
               Select All
             </Button>
             {selectedIds.size > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={deselectAll}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={deselectAll}>
                 Deselect All
               </Button>
             )}

@@ -182,7 +182,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
-          className="relative flex w-full flex-col rounded-lg border-2 border-border p-3 transition-colors hover:border-primary hover:bg-accent text-left min-h-[140px]"
+          className="relative flex w-full flex-col rounded-lg border-2 border-border p-3 transition-colors hover:border-primary hover:bg-accent text-left min-h-[120px] md:min-h-[140px]"
         >
           {/* Header row with tray label and unassign button */}
           <div className="flex items-center justify-between w-full mb-2">
@@ -241,8 +241,8 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
                   #{assignedSpool.id}
                 </span>
                 {showWeight && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {Math.round(displayWeight)}g Remaining
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 whitespace-nowrap">
+                    {Math.round(displayWeight)}g<span className="hidden min-[320px]:inline"> Remaining</span>
                   </Badge>
                 )}
               </div>

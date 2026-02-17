@@ -58,6 +58,48 @@ function CollapsibleSection({
   );
 }
 
+/**
+ * Shows Tabs on wider screens, Select dropdown on narrow screens.
+ * Prevents tab buttons from overlapping adjacent controls at small widths.
+ */
+function ResponsiveTabSelect({
+  value,
+  onValueChange,
+  options,
+}: {
+  value: string;
+  onValueChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <>
+      {/* Dropdown on small screens */}
+      <div className="sm:hidden">
+        <Select value={value} onValueChange={onValueChange}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Tabs on wider screens */}
+      <div className="hidden sm:block">
+        <Tabs value={value} onValueChange={onValueChange}>
+          <TabsList className="h-8 w-full">
+            {options.map((o) => (
+              <TabsTrigger key={o.value} value={o.value} className="text-xs px-2">{o.label}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+    </>
+  );
+}
+
 function NumberInput({
   label,
   value,
@@ -109,7 +151,7 @@ export function LabelSheetSettings({
     <div className="space-y-2">
       {/* Print Settings */}
       <CollapsibleSection title="Print Settings" defaultOpen>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Paper Size */}
           <div className="space-y-1">
             <Label className="text-xs">Paper Size</Label>
@@ -131,13 +173,15 @@ export function LabelSheetSettings({
           {/* Border */}
           <div className="space-y-1">
             <Label className="text-xs">Borders</Label>
-            <Tabs value={sheet.borderMode} onValueChange={(v) => updateSheet({ borderMode: v as SheetSettings['borderMode'] })}>
-              <TabsList className="h-8 w-full">
-                <TabsTrigger value="none" className="text-xs px-2">None</TabsTrigger>
-                <TabsTrigger value="border" className="text-xs px-2">Border</TabsTrigger>
-                <TabsTrigger value="grid" className="text-xs px-2">Grid</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <ResponsiveTabSelect
+              value={sheet.borderMode}
+              onValueChange={(v) => updateSheet({ borderMode: v as SheetSettings['borderMode'] })}
+              options={[
+                { value: 'none', label: 'None' },
+                { value: 'border', label: 'Border' },
+                { value: 'grid', label: 'Grid' },
+              ]}
+            />
           </div>
         </div>
 
@@ -159,16 +203,18 @@ export function LabelSheetSettings({
 
       {/* Content Settings */}
       <CollapsibleSection title="Content Settings">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">QR Code</Label>
-            <Tabs value={content.qrMode} onValueChange={(v) => updateContent({ qrMode: v as ContentSettings['qrMode'] })}>
-              <TabsList className="h-8 w-full">
-                <TabsTrigger value="none" className="text-xs px-2">No</TabsTrigger>
-                <TabsTrigger value="simple" className="text-xs px-2">Simple</TabsTrigger>
-                <TabsTrigger value="icon" className="text-xs px-2">Icon</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <ResponsiveTabSelect
+              value={content.qrMode}
+              onValueChange={(v) => updateContent({ qrMode: v as ContentSettings['qrMode'] })}
+              options={[
+                { value: 'none', label: 'No QR' },
+                { value: 'simple', label: 'Simple' },
+                { value: 'icon', label: 'Icon' },
+              ]}
+            />
           </div>
           <NumberInput
             label="Text Size"

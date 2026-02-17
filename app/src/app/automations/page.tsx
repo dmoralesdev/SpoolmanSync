@@ -204,7 +204,7 @@ export default function AutomationsPage() {
       <div className="min-h-screen bg-background">
         <Nav />
         <main className="w-full max-w-4xl mx-auto py-6 px-3 sm:px-4 md:px-6">
-          <h1 className="text-2xl font-bold mb-6">Automations</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mb-6">Automations</h1>
 
           <div className="space-y-6">
             <Card>
@@ -339,8 +339,8 @@ export default function AutomationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Nav />
-      <main className="container py-8 px-4 max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6">Automations Setup</h1>
+      <main className="w-full max-w-4xl mx-auto py-6 px-3 sm:px-4 md:px-6">
+        <h1 className="text-xl sm:text-2xl font-bold mb-6">Automations Setup</h1>
 
         <div className="space-y-6">
           {/* Status Card */}

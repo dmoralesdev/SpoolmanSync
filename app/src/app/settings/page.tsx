@@ -352,7 +352,7 @@ function SettingsContent() {
     <div className="min-h-screen bg-background">
       <Nav />
       <main className="w-full max-w-2xl mx-auto py-6 px-3 sm:px-4 md:px-6">
-        <h1 className="text-2xl font-bold mb-6">Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold mb-6">Settings</h1>
 
         <div className="space-y-6">
           {/* Home Assistant Settings */}

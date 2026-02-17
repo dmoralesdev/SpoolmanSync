@@ -145,7 +145,7 @@ export default function SpoolAssignPage({
               Back
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Assign Spool</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Assign Spool</h1>
         </div>
 
         {/* Loading State */}

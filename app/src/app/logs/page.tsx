@@ -264,7 +264,7 @@ export default function LogsPage() {
       <main className="w-full max-w-7xl mx-auto py-6 px-3 sm:px-4 md:px-6">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Activity Logs</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Activity Logs</h1>
             {connected && (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
@@ -286,7 +286,7 @@ export default function LogsPage() {
               size="sm"
               onClick={() => handleFilterChange(option.value)}
               title={option.description}
-              className="text-xs sm:text-sm"
+              className="text-xs sm:text-sm h-auto min-h-[32px] py-1 text-center whitespace-normal"
             >
               {option.label}
             </Button>
