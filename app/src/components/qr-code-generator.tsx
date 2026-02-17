@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Printer, QrCode } from 'lucide-react';
+import { Printer, QrCode, Maximize2, Minimize2 } from 'lucide-react';
 import { SpoolColorSwatch } from '@/components/spool-color-swatch';
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
@@ -142,6 +142,7 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
   const [printedSpools, setPrintedSpools] = useState<Set<number>>(() => loadPrintedSpools());
   const [hidePrinted, setHidePrinted] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [spoolListExpanded, setSpoolListExpanded] = useState(false);
 
   // Persist config to localStorage on change
   useEffect(() => {
@@ -338,13 +339,24 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
           </div>
         </div>
 
-        <Command className="rounded-lg border">
-          <CommandInput
-            placeholder="Search spools by name, vendor, material, or ID..."
-            value={searchValue}
-            onValueChange={setSearchValue}
-          />
-          <CommandList className="max-h-[200px]">
+        <Command className="rounded-lg border relative">
+          <div className="relative">
+            <CommandInput
+              placeholder="Search spools by name, vendor, material, or ID..."
+              value={searchValue}
+              onValueChange={setSearchValue}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setSpoolListExpanded(!spoolListExpanded)}
+              title={spoolListExpanded ? 'Collapse list' : 'Expand list'}
+            >
+              {spoolListExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+          <CommandList className={spoolListExpanded ? 'max-h-[60vh]' : 'max-h-[200px]'}>
             <CommandEmpty>No spools found.</CommandEmpty>
             <CommandGroup heading={`${filteredSpools.length} spools`}>
               {filteredSpools.map((spool) => {
