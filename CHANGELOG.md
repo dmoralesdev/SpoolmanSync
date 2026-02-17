@@ -5,6 +5,21 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-17
+
+### Added
+- **Multi-printer automation support** — Configure Automations now generates per-printer automations, helpers, and template sensors for all discovered printers instead of only the first (#20)
+- **Spool sorting** — Sort by ID, Name, Material, or Vendor in the QR label generator, NFC writer, and tray assignment dialog
+- **QR label sheet persistence** — Label sheet settings and printed-spool tracking are saved to localStorage across sessions
+- **AMS Pro type-first entity naming** — Support for Danish and other locales where ha-bambulab produces entity IDs like `ams_pro_2_bakke_1` (#18)
+
+### Fixed
+- `utility_meter.calibrate` unknown action error — `cycle: none` is not a valid HA utility_meter value; omit the key entirely for no-cycle behavior (#19, #21)
+- Responsive UI issues on logs page and tray assignment dialog on mobile
+
+### Changed
+- Helper entity names now include the printer prefix (e.g., `input_number.spoolmansync_{prefix}_last_tray`). **Existing users must click "Reconfigure Automations" once** after updating. Old singleton entities will become orphaned and can be manually deleted from the HA entity registry.
+
 ## [1.1.2] - 2026-02-16
 
 ### Added
