@@ -245,7 +245,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
                 </span>
                 {showWeight && (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {Math.round(displayWeight)}g
+                    {Math.round(displayWeight)}g Remaining
                   </Badge>
                 )}
               </div>
