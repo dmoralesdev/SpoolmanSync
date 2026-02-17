@@ -13,7 +13,9 @@ export interface Filament {
   name: string;
   vendor: Vendor;
   material: string;
-  color_hex: string;
+  color_hex: string | null;
+  multi_color_hexes: string | null;
+  multi_color_direction: 'coaxial' | 'longitudinal' | null;
   density: number;
   diameter: number;
   weight?: number;

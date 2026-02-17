@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { SpoolFilterBar } from '@/components/dashboard/spool-filter-bar';
+import { SpoolColorSwatch } from '@/components/spool-color-swatch';
 import type { HATray } from '@/lib/api/homeassistant';
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
@@ -160,7 +161,6 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
     return sortSpools(filtered, sortBy);
   }, [spools, filters, sortBy]);
 
-  const colorHex = assignedSpool?.filament.color_hex || tray.color?.replace('#', '') || 'cccccc';
   // Only show weight from Spoolman when a spool is assigned
   const displayWeight = assignedSpool?.remaining_weight;
   // Only show weight if spool is assigned and weight is a valid positive number
@@ -217,10 +217,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
             <>
               {/* Main content: color circle + filament name */}
               <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="h-8 w-8 rounded-full border-2 border-border flex-shrink-0"
-                  style={{ backgroundColor: `#${colorHex}` }}
-                />
+                <SpoolColorSwatch filament={assignedSpool.filament} />
                 <p className="text-sm font-semibold leading-tight line-clamp-2 [hyphens:none]" title={assignedSpool.filament.name || assignedSpool.filament.material}>
                   {assignedSpool.filament.name || assignedSpool.filament.material}
                 </p>
@@ -370,10 +367,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
                   }}
                   className="flex items-center gap-3 py-2"
                 >
-                  <div
-                    className="h-6 w-6 rounded-full border flex-shrink-0"
-                    style={{ backgroundColor: `#${spool.filament.color_hex}` }}
-                  />
+                  <SpoolColorSwatch filament={spool.filament} size="h-6 w-6" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       {spool.filament.name || spool.filament.material}

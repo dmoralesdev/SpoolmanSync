@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Printer, QrCode } from 'lucide-react';
+import { SpoolColorSwatch } from '@/components/spool-color-swatch';
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
 import {
@@ -360,10 +361,7 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
                       className="flex-shrink-0"
                       tabIndex={-1}
                     />
-                    <div
-                      className="h-5 w-5 rounded-full border flex-shrink-0"
-                      style={{ backgroundColor: `#${spool.filament.color_hex}` }}
-                    />
+                    <SpoolColorSwatch filament={spool.filament} size="h-5 w-5" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
                         {spool.filament.name || spool.filament.material}

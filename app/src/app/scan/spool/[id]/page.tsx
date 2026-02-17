@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/command';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
+import { SpoolColorSwatch } from '@/components/spool-color-swatch';
 import type { Spool } from '@/lib/api/spoolman';
 import Link from 'next/link';
 
@@ -173,10 +174,7 @@ export default function SpoolAssignPage({
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <div
-                    className="h-6 w-6 rounded-full border"
-                    style={{ backgroundColor: `#${spool.filament.color_hex}` }}
-                  />
+                  <SpoolColorSwatch filament={spool.filament} size="h-6 w-6" />
                   Spool #{spool.id}
                 </CardTitle>
                 <CardDescription>

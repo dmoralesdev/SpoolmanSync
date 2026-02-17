@@ -118,16 +118,40 @@ export function LabelCell({ spool, url, widthMm, heightMm, content, layout }: La
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5mm' }}>
-            {content.showColor && (
-              <div style={{
-                width: `${sz}mm`,
-                height: `${sz}mm`,
-                borderRadius: '50%',
-                backgroundColor: `#${spool.filament.color_hex}`,
-                border: '0.2mm solid #000',
-                flexShrink: 0,
-              }} />
-            )}
+            {content.showColor && (() => {
+              const colors = spool.filament.multi_color_hexes
+                ? spool.filament.multi_color_hexes.split(',')
+                : null;
+              if (colors && colors.length > 1) {
+                const isLongitudinal = spool.filament.multi_color_direction === 'longitudinal';
+                return (
+                  <div style={{
+                    width: `${sz}mm`,
+                    height: `${sz}mm`,
+                    borderRadius: '50%',
+                    border: '0.2mm solid #000',
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: isLongitudinal ? 'column' : 'row',
+                  }}>
+                    {colors.map((hex, i) => (
+                      <div key={i} style={{ flex: 1, backgroundColor: `#${hex}` }} />
+                    ))}
+                  </div>
+                );
+              }
+              return (
+                <div style={{
+                  width: `${sz}mm`,
+                  height: `${sz}mm`,
+                  borderRadius: '50%',
+                  backgroundColor: `#${spool.filament.color_hex || 'cccccc'}`,
+                  border: '0.2mm solid #000',
+                  flexShrink: 0,
+                }} />
+              );
+            })()}
             {content.showMaterial && (
               <div style={{
                 fontSize: `${sz * 0.85}mm`,

@@ -25,6 +25,7 @@ import {
   AlertTitle,
 } from '@/components/ui/alert';
 import { Nfc, CheckCircle2, XCircle, Loader2, AlertTriangle, Smartphone } from 'lucide-react';
+import { SpoolColorSwatch } from '@/components/spool-color-swatch';
 import type { Spool } from '@/lib/api/spoolman';
 import { buildSpoolSearchValue, parseExtraValue } from '@/lib/api/spoolman';
 import { buildExternalUrl } from '@/lib/ingress-path';
@@ -329,10 +330,7 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
                 onSelect={() => handleSpoolSelect(spool)}
                 className="flex items-center gap-3 py-2 cursor-pointer"
               >
-                <div
-                  className="h-5 w-5 rounded-full border flex-shrink-0"
-                  style={{ backgroundColor: `#${spool.filament.color_hex}` }}
-                />
+                <SpoolColorSwatch filament={spool.filament} size="h-5 w-5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
                     {spool.filament.name || spool.filament.material}
@@ -355,10 +353,7 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
         <div className="space-y-4">
           {/* Selected Spool Info */}
           <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
-            <div
-              className="h-10 w-10 rounded-full border-2 flex-shrink-0"
-              style={{ backgroundColor: `#${selectedSpool.filament.color_hex}` }}
-            />
+            <SpoolColorSwatch filament={selectedSpool.filament} size="h-10 w-10" />
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">
                 {selectedSpool.filament.vendor.name} {selectedSpool.filament.name}
