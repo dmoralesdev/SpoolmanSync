@@ -164,37 +164,60 @@ export async function POST(request: NextRequest) {
           // Not fatal - user can restart HA manually
         }
 
-        // Register automations in our database
-        const trayIds: string[] = [];
+        // Register one automation record per printer
+        const currentAutomationIds: string[] = [];
         for (const printer of printers) {
+          const prefix = extractPrinterPrefix(printer.entity_id);
+          const printerTrayIds: string[] = [];
           for (const ams of printer.ams_units) {
             for (const tray of ams.trays) {
-              trayIds.push(tray.entity_id);
+              printerTrayIds.push(tray.entity_id);
             }
           }
           if (printer.external_spool) {
-            trayIds.push(printer.external_spool.entity_id);
+            printerTrayIds.push(printer.external_spool.entity_id);
           }
+
+          const automationId = `spoolmansync_update_spool_${prefix}`;
+          currentAutomationIds.push(automationId);
+
+          await prisma.automation.upsert({
+            where: { haAutomationId: automationId },
+            create: {
+              haAutomationId: automationId,
+              trayId: printerTrayIds.join(','),
+              printerId: printer.name,
+            },
+            update: {
+              trayId: printerTrayIds.join(','),
+              printerId: printer.name,
+            },
+          });
         }
 
-        // Upsert automation tracking record using centralized pattern extraction
-        const automationId = `spoolmansync_update_spool_${extractPrinterPrefix(printers[0].entity_id)}`;
-        await prisma.automation.upsert({
-          where: { haAutomationId: automationId },
-          create: {
-            haAutomationId: automationId,
-            trayId: trayIds.join(','),
-            printerId: printers[0].name,
-          },
-          update: {
-            trayId: trayIds.join(','),
+        // Clean up stale automation records for printers no longer present
+        const staleRecords = await prisma.automation.findMany({
+          where: {
+            haAutomationId: { startsWith: 'spoolmansync_update_spool_' },
+            NOT: { haAutomationId: { in: currentAutomationIds } },
           },
         });
+        if (staleRecords.length > 0) {
+          await prisma.automation.deleteMany({
+            where: { id: { in: staleRecords.map(r => r.id) } },
+          });
+          console.log(`Cleaned up ${staleRecords.length} stale automation record(s)`);
+        }
+
+        const allTrayIds = printers.flatMap(p => [
+          ...p.ams_units.flatMap(ams => ams.trays.map(t => t.entity_id)),
+          ...(p.external_spool ? [p.external_spool.entity_id] : []),
+        ]);
 
         await createActivityLog({
           type: 'automation_created',
           message: `Auto-configured SpoolmanSync for ${config.printerCount} printer(s), ${config.trayCount} tray(s)`,
-          details: { printers: printers.map(p => p.name), trayIds },
+          details: { printers: printers.map(p => p.name), trayIds: allTrayIds },
         });
 
         return NextResponse.json({

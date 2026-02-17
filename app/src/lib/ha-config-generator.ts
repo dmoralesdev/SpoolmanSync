@@ -28,6 +28,16 @@ interface TrayInfo {
 }
 
 /**
+ * Per-printer config collected during discovery
+ */
+interface PrinterConfig {
+  prefix: string;
+  name: string;
+  allTrays: TrayInfo[];
+  discoveredEntities: LocalizedEntities;
+}
+
+/**
  * Generate complete HA configuration for SpoolmanSync
  */
 export function generateHAConfig(
@@ -44,82 +54,79 @@ export function generateHAConfig(
     };
   }
 
-  // For now, use the first printer (most users have one)
-  // TODO: Support multiple printers
-  const printer = printers[0];
-  const prefix = extractPrinterPrefix(printer.entity_id);
+  // Process each printer
+  const printerConfigs: PrinterConfig[] = [];
+  const automationsYamlParts: string[] = [];
+  let totalTrayCount = 0;
 
-  // Use discovered entity IDs for automation generation
-  // This handles localized entity names automatically since we discover the actual IDs from HA
-  // If entities aren't found, log warnings - don't fall back to guessing names
-  const missingEntities: string[] = [];
+  for (const printer of printers) {
+    const prefix = extractPrinterPrefix(printer.entity_id);
 
-  if (!printer.current_stage_entity) {
-    missingEntities.push('current_stage');
-    console.warn(`[SpoolmanSync] Could not find current_stage entity for printer ${prefix}. Automation triggers may not work.`);
-  }
-  if (!printer.print_weight_entity) {
-    missingEntities.push('print_weight');
-    console.warn(`[SpoolmanSync] Could not find print_weight entity for printer ${prefix}. Filament usage tracking may not work.`);
-  }
-  if (!printer.print_progress_entity) {
-    missingEntities.push('print_progress');
-    console.warn(`[SpoolmanSync] Could not find print_progress entity for printer ${prefix}. Filament usage tracking may not work.`);
-  }
+    // Check for missing entities
+    const missingEntities: string[] = [];
+    if (!printer.current_stage_entity) {
+      missingEntities.push('current_stage');
+      console.warn(`[SpoolmanSync] Could not find current_stage entity for printer ${prefix}. Automation triggers may not work.`);
+    }
+    if (!printer.print_weight_entity) {
+      missingEntities.push('print_weight');
+      console.warn(`[SpoolmanSync] Could not find print_weight entity for printer ${prefix}. Filament usage tracking may not work.`);
+    }
+    if (!printer.print_progress_entity) {
+      missingEntities.push('print_progress');
+      console.warn(`[SpoolmanSync] Could not find print_progress entity for printer ${prefix}. Filament usage tracking may not work.`);
+    }
+    if (missingEntities.length > 0) {
+      console.warn(`[SpoolmanSync] Missing entities for ${prefix}: ${missingEntities.join(', ')}. Please report at https://github.com/gibz104/SpoolmanSync/issues`);
+    }
 
-  if (missingEntities.length > 0) {
-    console.warn(`[SpoolmanSync] Missing entities: ${missingEntities.join(', ')}. Your Home Assistant may be using a language not yet supported. Please report your entity names at https://github.com/gibz104/SpoolmanSync/issues`);
-  }
+    const discoveredEntities: LocalizedEntities = {
+      current_stage: printer.current_stage_entity || '',
+      print_weight: printer.print_weight_entity || '',
+      print_progress: printer.print_progress_entity || '',
+      external_spool: printer.external_spool?.entity_id || '',
+    };
 
-  const discoveredEntities: LocalizedEntities = {
-    current_stage: printer.current_stage_entity || '',
-    print_weight: printer.print_weight_entity || '',
-    print_progress: printer.print_progress_entity || '',
-    external_spool: printer.external_spool?.entity_id || '',
-  };
+    // Collect all trays from all AMS units
+    const allTrays: TrayInfo[] = [];
 
-  // Collect all trays from all AMS units
-  const allTrays: TrayInfo[] = [];
-
-  // Add external spool first (composite ID = 0)
-  if (printer.external_spool) {
-    allTrays.push({
-      entityId: printer.external_spool.entity_id,
-      amsNumber: 0,
-      trayNumber: 0,
-      compositeId: 0,
-    });
-  }
-
-  // Add trays from all AMS units
-  for (const ams of printer.ams_units) {
-    // Extract AMS number from entity_id (e.g., sensor.xxx_ams_2_humidity -> 2, sensor.xxx_ams_lite_... -> 1)
-    const amsMatch = ams.entity_id.match(/_ams_(\d+|lite)_/);
-    const amsNumber = amsMatch ? (amsMatch[1] === 'lite' ? 1 : parseInt(amsMatch[1], 10)) : 1;
-
-    for (const tray of ams.trays) {
+    if (printer.external_spool) {
       allTrays.push({
-        entityId: tray.entity_id,
-        amsNumber,
-        trayNumber: tray.tray_number,
-        compositeId: amsNumber * 10 + tray.tray_number, // e.g., AMS2 tray 3 = 23
+        entityId: printer.external_spool.entity_id,
+        amsNumber: 0,
+        trayNumber: 0,
+        compositeId: 0,
       });
     }
+
+    for (const ams of printer.ams_units) {
+      const amsMatch = ams.entity_id.match(/_ams_(\d+|lite)_/);
+      const amsNumber = amsMatch ? (amsMatch[1] === 'lite' ? 1 : parseInt(amsMatch[1], 10)) : 1;
+      for (const tray of ams.trays) {
+        allTrays.push({
+          entityId: tray.entity_id,
+          amsNumber,
+          trayNumber: tray.tray_number,
+          compositeId: amsNumber * 10 + tray.tray_number,
+        });
+      }
+    }
+
+    totalTrayCount += allTrays.length;
+    printerConfigs.push({ prefix, name: printer.name, allTrays, discoveredEntities });
+
+    // Generate automations for this printer
+    automationsYamlParts.push(generateAutomationsYaml(prefix, allTrays, webhookUrl, discoveredEntities));
   }
 
-  const trayCount = allTrays.length;
-
-  // Generate the comprehensive automation
-  const automationsYaml = generateAutomationsYaml(prefix, allTrays, webhookUrl, discoveredEntities);
-
-  // Generate configuration additions
-  const configurationAdditions = generateConfigurationAdditions(prefix, allTrays, spoolmanUrl, discoveredEntities);
+  const automationsYaml = automationsYamlParts.join('\n');
+  const configurationAdditions = generateConfigurationAdditions(printerConfigs, spoolmanUrl);
 
   return {
     automationsYaml,
     configurationAdditions,
     printerCount: printers.length,
-    trayCount,
+    trayCount: totalTrayCount,
   };
 }
 
@@ -183,7 +190,7 @@ function generateAutomationsYaml(
 # - etc.
 # =============================================================================
 - id: 'spoolmansync_update_spool_${prefix}'
-  alias: SpoolmanSync - Update Spool
+  alias: SpoolmanSync - Update Spool (${prefix})
   description: Track spool usage and sync with Spoolman
   triggers:
     - entity_id: sensor.spoolmansync_${prefix}_active_tray
@@ -213,13 +220,13 @@ function generateAutomationsYaml(
     # For print_end: use the helper
     tray_composite: |-
       {% if trigger.id == 'print_end' %}
-        {{ states('input_number.spoolmansync_last_tray') | int(-1) }}
+        {{ states('input_number.spoolmansync_${prefix}_last_tray') | int(-1) }}
       {% else %}
         {{ old_tray }}
       {% endif %}
     # Build sensor entity ID for the tray we're logging
     tray_sensor: "${trayEntityLookup}"
-    tray_weight: "{{ states('sensor.spoolmansync_filament_usage_meter') | float(0) | round(2) }}"
+    tray_weight: "{{ states('sensor.spoolmansync_${prefix}_filament_usage_meter') | float(0) | round(2) }}"
     tray_uuid: "{{ state_attr(tray_sensor, 'tray_uuid') | default('') }}"
     material: "{{ state_attr(tray_sensor, 'type') | default('') }}"
     name: "{{ state_attr(tray_sensor, 'name') | default('') }}"
@@ -264,7 +271,7 @@ function generateAutomationsYaml(
                         filament_active_tray_id: "{{ tray_sensor }}"
                     - action: utility_meter.calibrate
                       target:
-                        entity_id: sensor.spoolmansync_filament_usage_meter
+                        entity_id: sensor.spoolmansync_${prefix}_filament_usage_meter
                       data:
                         value: "0"
               default:
@@ -278,7 +285,7 @@ function generateAutomationsYaml(
                 # Reset meter anyway to prevent stale values from accumulating
                 - action: utility_meter.calibrate
                   target:
-                    entity_id: sensor.spoolmansync_filament_usage_meter
+                    entity_id: sensor.spoolmansync_${prefix}_filament_usage_meter
                   data:
                     value: "0"
             # ALWAYS update helper to new tray composite ID
@@ -286,12 +293,12 @@ function generateAutomationsYaml(
               value_template: "{{ new_tray >= 0 }}"
             - action: input_number.set_value
               target:
-                entity_id: input_number.spoolmansync_last_tray
+                entity_id: input_number.spoolmansync_${prefix}_last_tray
               data:
                 value: "{{ new_tray }}"
             - action: system_log.write
               data:
-                message: "SPOOLMANSYNC HELPER UPDATED | input_number.spoolmansync_last_tray -> {{ new_tray }}"
+                message: "SPOOLMANSYNC HELPER UPDATED | input_number.spoolmansync_${prefix}_last_tray -> {{ new_tray }}"
                 level: info
 
         # =====================================================================
@@ -335,7 +342,7 @@ function generateAutomationsYaml(
             # Always reset meter after print
             - action: utility_meter.calibrate
               target:
-                entity_id: sensor.spoolmansync_filament_usage_meter
+                entity_id: sensor.spoolmansync_${prefix}_filament_usage_meter
               data:
                 value: "0"
             - action: system_log.write
@@ -351,7 +358,7 @@ function generateAutomationsYaml(
 # Triggers when any AMS tray or external spool sensor changes state.
 # =============================================================================
 - id: 'spoolmansync_tray_change_${prefix}'
-  alias: SpoolmanSync - Tray Change
+  alias: SpoolmanSync - Tray Change (${prefix})
   description: Detect physical spool changes and auto-assign/unassign in Spoolman
   triggers:
     # Trigger on any state or attribute change for tray sensors
@@ -458,29 +465,63 @@ function buildActiveTrayDetection(allTrays: TrayInfo[]): string {
 }
 
 /**
- * Generate configuration.yaml additions
- * Supports multiple AMS units
+ * Generate configuration.yaml additions for all printers
+ * Aggregates entries under single YAML top-level keys (no duplicate keys)
  */
 function generateConfigurationAdditions(
-  prefix: string,
-  allTrays: TrayInfo[],
-  spoolmanUrl: string,
-  entities: LocalizedEntities
+  printerConfigs: PrinterConfig[],
+  spoolmanUrl: string
 ): string {
-  // Build the active tray detection logic
-  const activeTrayDetection = buildActiveTrayDetection(allTrays);
+  const printerList = printerConfigs.map(p => p.prefix).join(', ');
+  const totalTrays = printerConfigs.reduce((sum, p) => sum + p.allTrays.length, 0);
 
-  // Build availability check including all tray entities
-  const availabilityEntities = allTrays.map(t => `'${t.entityId}'`);
+  // Build per-printer input_number entries
+  const inputNumberEntries = printerConfigs.map(p => {
+    const maxCompositeId = Math.max(...p.allTrays.map(t => t.compositeId), 99);
+    return `  spoolmansync_${p.prefix}_last_tray:
+    name: "SpoolmanSync ${p.prefix} Last Tray"
+    min: 0
+    max: ${maxCompositeId}
+    step: 1`;
+  }).join('\n');
 
-  // Calculate max value for input_number (needs to accommodate highest composite ID)
-  const maxCompositeId = Math.max(...allTrays.map(t => t.compositeId), 99);
+  // Build per-printer utility_meter entries
+  const utilityMeterEntries = printerConfigs.map(p =>
+    `  spoolmansync_${p.prefix}_filament_usage_meter:
+    unique_id: spoolmansync-${p.prefix}-filament-usage-meter
+    source: sensor.spoolmansync_${p.prefix}_filament_usage
+    cycle: none`
+  ).join('\n');
+
+  // Build per-printer template sensor entries (filament usage + active tray)
+  const templateSensorEntries = printerConfigs.map(p => {
+    const activeTrayDetection = buildActiveTrayDetection(p.allTrays);
+    const availabilityEntities = p.allTrays.map(t => `'${t.entityId}'`);
+
+    return `      # ${p.prefix}: Calculate filament usage during print
+      - name: "SpoolmanSync ${p.prefix} Filament Usage"
+        unique_id: spoolmansync-${p.prefix}-filament-usage
+        state: >
+          {{ states('${p.discoveredEntities.print_weight}') | float(0) / 100 *
+             states('${p.discoveredEntities.print_progress}') | float(0) }}
+        availability: >
+          {{ states('${p.discoveredEntities.print_weight}') not in ['unknown', 'unavailable'] }}
+
+      # ${p.prefix}: Detect active tray from all AMS tray sensors and external spool
+      - name: "SpoolmanSync ${p.prefix} Active Tray"
+        unique_id: spoolmansync-${p.prefix}-active-tray
+        state: >${activeTrayDetection}
+        availability: >
+          {{ expand([
+            ${availabilityEntities.join(',\n            ')}
+          ]) | rejectattr('state', 'eq', 'unavailable') | list | count > 0 }}`;
+  }).join('\n\n');
 
   return `
 # =============================================================================
 # SpoolmanSync Configuration
-# Auto-generated for printer: ${prefix}
-# Supports ${allTrays.length} tray(s) across ${new Set(allTrays.map(t => t.amsNumber)).size} AMS unit(s)
+# Auto-generated for printer(s): ${printerList}
+# Supports ${totalTrays} tray(s) across ${printerConfigs.length} printer(s)
 #
 # Tray encoding: composite_id = ams_number * 10 + tray_number
 # - 0 = external spool
@@ -489,21 +530,13 @@ function generateConfigurationAdditions(
 # - etc.
 # =============================================================================
 
-# Helper to track last active tray (captures tray when it changes)
-# Stores composite ID encoding AMS number and tray number
+# Helper to track last active tray per printer
 input_number:
-  spoolmansync_last_tray:
-    name: "SpoolmanSync Last Tray"
-    min: 0
-    max: ${maxCompositeId}
-    step: 1
+${inputNumberEntries}
 
-# Utility meter to track filament usage between updates
+# Utility meter to track filament usage per printer
 utility_meter:
-  spoolmansync_filament_usage_meter:
-    unique_id: spoolmansync-filament-usage-meter
-    source: sensor.spoolmansync_filament_usage
-    cycle: none
+${utilityMeterEntries}
 
 # REST commands to send updates to SpoolmanSync webhook
 rest_command:
@@ -541,24 +574,7 @@ rest_command:
 # Template sensors for filament tracking
 template:
   - sensor:
-      # Calculate filament usage during print
-      - name: "SpoolmanSync Filament Usage"
-        unique_id: spoolmansync-filament-usage
-        state: >
-          {{ states('${entities.print_weight}') | float(0) / 100 *
-             states('${entities.print_progress}') | float(0) }}
-        availability: >
-          {{ states('${entities.print_weight}') not in ['unknown', 'unavailable'] }}
-
-      # Detect active tray from all AMS tray sensors and external spool
-      # Returns composite ID: 0 = external, 11-14 = AMS1, 21-24 = AMS2, etc.
-      - name: "SpoolmanSync ${prefix} Active Tray"
-        unique_id: spoolmansync-${prefix}-active-tray
-        state: >${activeTrayDetection}
-        availability: >
-          {{ expand([
-            ${availabilityEntities.join(',\n            ')}
-          ]) | rejectattr('state', 'eq', 'unavailable') | list | count > 0 }}
+${templateSensorEntries}
 `;
 }
 
