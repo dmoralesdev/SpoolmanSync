@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { HomeAssistantClient, HATray } from '@/lib/api/homeassistant';
 import { SpoolmanClient, Spool } from '@/lib/api/spoolman';
+import { getHiddenPrinters } from '@/app/api/printers/setup/route';
 
 interface MismatchInfo {
   type: 'material' | 'color' | 'both';
@@ -89,7 +90,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Home Assistant not configured' }, { status: 400 });
     }
 
-    const printers = await haClient.discoverPrinters();
+    const allPrinters = await haClient.discoverPrinters();
+
+    // Filter out printers removed from SpoolmanSync
+    const hiddenPrintersList = await getHiddenPrinters();
+    const hiddenTitles = new Set(hiddenPrintersList.map(h => h.title.toLowerCase()).filter(Boolean));
+
+    const printers = hiddenTitles.size > 0
+      ? allPrinters.filter(p => {
+          const name = p.name.toLowerCase();
+          const entityId = p.entity_id.toLowerCase();
+          return ![...hiddenTitles].some(t => name.includes(t) || entityId.includes(t));
+        })
+      : allPrinters;
 
     // If Spoolman is configured, enrich with spool data
     if (spoolmanConnection) {

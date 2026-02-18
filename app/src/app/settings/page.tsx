@@ -57,8 +57,10 @@ function SettingsContent() {
 
   // Printer states
   const [printers, setPrinters] = useState<ConfigEntry[]>([]);
+  const [hiddenPrinters, setHiddenPrinters] = useState<ConfigEntry[]>([]);
   const [addPrinterOpen, setAddPrinterOpen] = useState(false);
   const [removingPrinter, setRemovingPrinter] = useState<string | null>(null);
+  const [readdingPrinter, setReaddingPrinter] = useState<string | null>(null);
 
   // Admin credentials state (embedded mode)
   const [showPassword, setShowPassword] = useState(false);
@@ -96,10 +98,13 @@ function SettingsContent() {
     }
   }, [searchParams]);
 
-  // Fetch printers only when HA is connected
+  // Fetch printers when HA is connected, and poll to stay in sync
+  // with changes made directly in HA (e.g. printer added/removed in ha-bambulab)
   useEffect(() => {
     if (settings?.homeassistant?.connected) {
       fetchPrinters();
+      const interval = setInterval(fetchPrinters, 10000);
+      return () => clearInterval(interval);
     }
   }, [settings?.homeassistant?.connected]);
 
@@ -145,6 +150,7 @@ function SettingsContent() {
       if (res.ok) {
         const data = await res.json();
         setPrinters(data.entries || []);
+        setHiddenPrinters(data.hiddenEntries || []);
       }
     } catch {
       // Silently fail - HA might not be connected yet
@@ -170,6 +176,28 @@ function SettingsContent() {
       toast.error(err instanceof Error ? err.message : 'Failed to remove printer');
     } finally {
       setRemovingPrinter(null);
+    }
+  };
+
+  const readdPrinter = async (entryId: string) => {
+    setReaddingPrinter(entryId);
+    try {
+      const res = await fetch('/api/printers/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unhide', entryId }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to re-add printer');
+      }
+
+      toast.success('Printer added back to SpoolmanSync');
+      fetchPrinters();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to re-add printer');
+    } finally {
+      setReaddingPrinter(null);
     }
   };
 
@@ -618,40 +646,64 @@ function SettingsContent() {
                 </div>
               </CardHeader>
               <CardContent>
-                {printers.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <p>No printers configured yet.</p>
-                    <p className="text-sm mt-1">Click &quot;Add Printer&quot; to connect your Bambu Lab printer.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {printers.map((printer) => (
-                      <div
-                        key={printer.entry_id}
-                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{printer.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {printer.state === 'loaded' ? (
-                              <span className="text-green-600 dark:text-green-400">Connected</span>
-                            ) : (
-                              <span className="text-yellow-600 dark:text-yellow-400">{printer.state}</span>
-                            )}
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removePrinter(printer.entry_id)}
-                          disabled={removingPrinter === printer.entry_id}
-                        >
-                          {removingPrinter === printer.entry_id ? 'Removing...' : 'Remove'}
-                        </Button>
+                <div className="space-y-3">
+                  {printers.length === 0 && hiddenPrinters.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <p>No printers configured yet.</p>
+                      <p className="text-sm mt-1">Click &quot;Add Printer&quot; to connect your Bambu Lab printer.</p>
+                    </div>
+                  )}
+                  {printers.map((printer) => (
+                    <div
+                      key={printer.entry_id}
+                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium">{printer.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {printer.state === 'loaded' ? (
+                            <span className="text-green-600 dark:text-green-400">Connected</span>
+                          ) : (
+                            <span className="text-yellow-600 dark:text-yellow-400">{printer.state}</span>
+                          )}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removePrinter(printer.entry_id)}
+                        disabled={removingPrinter === printer.entry_id}
+                      >
+                        {removingPrinter === printer.entry_id ? 'Removing...' : 'Remove'}
+                      </Button>
+                    </div>
+                  ))}
+                  {hiddenPrinters.length > 0 && (
+                    <div className={printers.length > 0 ? 'pt-2 border-t' : ''}>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Removed from SpoolmanSync (still in Home Assistant):
+                      </p>
+                      {hiddenPrinters.map((printer) => (
+                        <div
+                          key={printer.entry_id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed"
+                        >
+                          <div>
+                            <p className="font-medium text-muted-foreground">{printer.title}</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => readdPrinter(printer.entry_id)}
+                            disabled={readdingPrinter === printer.entry_id}
+                          >
+                            {readdingPrinter === printer.entry_id ? 'Adding...' : 'Re-add'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}

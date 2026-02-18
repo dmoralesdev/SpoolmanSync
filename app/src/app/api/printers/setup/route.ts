@@ -1,11 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HomeAssistantClient } from '@/lib/api/homeassistant';
+import prisma from '@/lib/db';
 
 const BAMBU_LAB_DOMAIN = 'bambu_lab';
+const HIDDEN_PRINTERS_KEY = 'hidden_printers';
+
+/**
+ * Get the list of hidden printer entries (entry_id + title) that
+ * the user has removed from SpoolmanSync.
+ */
+export async function getHiddenPrinters(): Promise<{ entryId: string; title: string }[]> {
+  const setting = await prisma.settings.findUnique({ where: { key: HIDDEN_PRINTERS_KEY } });
+  if (!setting) return [];
+  try {
+    const parsed = JSON.parse(setting.value);
+    // Support both old format (string[]) and new format ({entryId, title}[])
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+      return parsed.map((id: string) => ({ entryId: id, title: '' }));
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+async function saveHiddenPrinters(hidden: { entryId: string; title: string }[]): Promise<void> {
+  await prisma.settings.upsert({
+    where: { key: HIDDEN_PRINTERS_KEY },
+    create: { key: HIDDEN_PRINTERS_KEY, value: JSON.stringify(hidden) },
+    update: { value: JSON.stringify(hidden) },
+  });
+}
 
 /**
  * GET /api/printers/setup
- * Get current Bambu Lab config entries (configured printers)
+ * Get current Bambu Lab config entries (configured printers),
+ * filtered to exclude printers the user has removed from SpoolmanSync.
+ * Also returns hidden entries so the UI can offer to re-add them.
  */
 export async function GET() {
   try {
@@ -17,8 +48,24 @@ export async function GET() {
 
     console.log('[Printers] Fetching config entries for domain:', BAMBU_LAB_DOMAIN);
     const entries = await client.getConfigEntries(BAMBU_LAB_DOMAIN);
-    console.log('[Printers] Found', entries.length, 'entries:', JSON.stringify(entries.map(e => ({ entry_id: e.entry_id, title: e.title, domain: e.domain, state: e.state }))));
-    return NextResponse.json({ entries });
+
+    // Filter out printers the user has hidden from SpoolmanSync
+    const hidden = await getHiddenPrinters();
+    const hiddenIds = new Set(hidden.map(h => h.entryId));
+    const currentEntryIds = new Set(entries.map(e => e.entry_id));
+    const visibleEntries = entries.filter(e => !hiddenIds.has(e.entry_id));
+    const hiddenEntries = entries.filter(e => hiddenIds.has(e.entry_id));
+
+    // Clean up stale hidden entries for printers no longer in HA
+    const staleHidden = hidden.filter(h => !currentEntryIds.has(h.entryId));
+    if (staleHidden.length > 0) {
+      const cleaned = hidden.filter(h => currentEntryIds.has(h.entryId));
+      await saveHiddenPrinters(cleaned);
+      console.log(`[Printers] Cleaned up ${staleHidden.length} stale hidden entry(ies)`);
+    }
+
+    console.log('[Printers] Found', entries.length, 'entries,', visibleEntries.length, 'visible,', hiddenEntries.length, 'hidden');
+    return NextResponse.json({ entries: visibleEntries, hiddenEntries });
   } catch (error) {
     console.error('[Printers] Error getting Bambu Lab entries:', error);
     return NextResponse.json({ error: 'Failed to get printer configurations' }, { status: 500 });
@@ -27,11 +74,12 @@ export async function GET() {
 
 /**
  * POST /api/printers/setup
- * Start or continue a Bambu Lab config flow
+ * Start or continue a Bambu Lab config flow, or unhide a printer.
  *
  * Body for starting flow: { action: 'start' }
  * Body for continuing flow: { action: 'continue', flowId: string, userInput: object }
  * Body for aborting flow: { action: 'abort', flowId: string }
+ * Body for re-adding hidden printer: { action: 'unhide', entryId: string }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { action, flowId, userInput } = body;
+    const { action, flowId, userInput, entryId } = body;
 
     switch (action) {
       case 'start': {
@@ -65,6 +113,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
+      case 'unhide': {
+        if (!entryId) {
+          return NextResponse.json({ error: 'entryId required' }, { status: 400 });
+        }
+        const hidden = await getHiddenPrinters();
+        const updated = hidden.filter(h => h.entryId !== entryId);
+        await saveHiddenPrinters(updated);
+        return NextResponse.json({ success: true });
+      }
+
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -77,17 +135,14 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/printers/setup
- * Remove a Bambu Lab config entry (printer)
+ * Remove a printer from SpoolmanSync (hides it from the UI).
+ * Does NOT remove the printer from Home Assistant or ha-bambulab.
+ * Also cleans up any SpoolmanSync automation records for the printer.
  *
  * Body: { entryId: string }
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const client = await HomeAssistantClient.fromConnection();
-    if (!client) {
-      return NextResponse.json({ error: 'Home Assistant not connected' }, { status: 400 });
-    }
-
     const body = await request.json();
     const { entryId } = body;
 
@@ -95,7 +150,39 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'entryId required' }, { status: 400 });
     }
 
-    await client.deleteConfigEntry(entryId);
+    // Look up the config entry title before hiding (for automation cleanup
+    // and for filtering discovered printers later)
+    let entryTitle = '';
+    try {
+      const client = await HomeAssistantClient.fromConnection();
+      if (client) {
+        const entries = await client.getConfigEntries('bambu_lab');
+        const entry = entries.find(e => e.entry_id === entryId);
+        if (entry) {
+          entryTitle = entry.title;
+
+          // Clean up SpoolmanSync automation records for this printer.
+          // printerId stores the discovered name (e.g. "X1C_00M09D462101575")
+          // while entry.title is the serial (e.g. "00M09D462101575"), so use contains.
+          const deleted = await prisma.automation.deleteMany({
+            where: { printerId: { contains: entry.title } },
+          });
+          if (deleted.count > 0) {
+            console.log(`Cleaned up ${deleted.count} automation record(s) for printer: ${entry.title}`);
+          }
+        }
+      }
+    } catch (cleanupError) {
+      console.error('Failed to clean up automation records:', cleanupError);
+    }
+
+    // Add to hidden printers list (store both entry_id and title)
+    const hidden = await getHiddenPrinters();
+    if (!hidden.some(h => h.entryId === entryId)) {
+      hidden.push({ entryId, title: entryTitle });
+      await saveHiddenPrinters(hidden);
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error removing printer:', error);

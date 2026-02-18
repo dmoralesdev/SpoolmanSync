@@ -4,6 +4,7 @@ import { HomeAssistantClient, isEmbeddedMode, isAddonMode } from '@/lib/api/home
 import { generateHAConfig, mergeConfiguration, mergeAutomations } from '@/lib/ha-config-generator';
 import { createActivityLog } from '@/lib/activity-log';
 import { extractPrinterPrefix } from '@/lib/entity-patterns';
+import { getHiddenPrinters } from '@/app/api/printers/setup/route';
 import * as fs from 'fs/promises';
 
 
@@ -42,12 +43,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'discover') {
-      // Discover all printers and trays, return automation config
-      const printers = await haClient.discoverPrinters();
+      // Discover printers and trays, filtering out any removed from SpoolmanSync
+      const allDiscovered = await haClient.discoverPrinters();
+      const hiddenForDiscover = await getHiddenPrinters();
+      const hiddenTitlesForDiscover = new Set(hiddenForDiscover.map(h => h.title.toLowerCase()).filter(Boolean));
+
+      const printers = hiddenTitlesForDiscover.size > 0
+        ? allDiscovered.filter(p => {
+            const name = p.name.toLowerCase();
+            const entityId = p.entity_id.toLowerCase();
+            return ![...hiddenTitlesForDiscover].some(t => name.includes(t) || entityId.includes(t));
+          })
+        : allDiscovered;
 
       if (printers.length === 0) {
         return NextResponse.json({
-          error: 'No Bambu Lab printers found. Please ensure ha-bambulab is configured.',
+          error: 'No Bambu Lab printers found. Please ensure ha-bambulab is configured and printers are added in SpoolmanSync Settings.',
         }, { status: 400 });
       }
 
@@ -99,11 +110,23 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Discover printers
-      const printers = await haClient.discoverPrinters();
+      // Discover printers, filtering out any hidden from SpoolmanSync
+      const allPrinters = await haClient.discoverPrinters();
+      const hiddenPrinters = await getHiddenPrinters();
+      const hiddenTitles = new Set(hiddenPrinters.map(h => h.title.toLowerCase()).filter(Boolean));
+
+      const printers = hiddenTitles.size > 0
+        ? allPrinters.filter(p => {
+            // Match by checking if the printer name or entity_id contains a hidden title
+            const name = p.name.toLowerCase();
+            const entityId = p.entity_id.toLowerCase();
+            return ![...hiddenTitles].some(t => name.includes(t) || entityId.includes(t));
+          })
+        : allPrinters;
+
       if (printers.length === 0) {
         return NextResponse.json({
-          error: 'No Bambu Lab printers found. Please add a printer first.',
+          error: 'No Bambu Lab printers found. Please add a printer in SpoolmanSync Settings first.',
         }, { status: 400 });
       }
 

@@ -317,7 +317,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>No Printers Found</CardTitle>
               <CardDescription>
-                Make sure your Bambu Lab printer is connected to Home Assistant via the ha-bambulab integration.
+                Make sure your Bambu Lab printer is connected to Home Assistant via the ha-bambulab integration and added in SpoolmanSync Settings.
               </CardDescription>
             </CardHeader>
           </Card>

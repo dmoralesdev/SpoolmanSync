@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,7 @@ interface RegisteredAutomation {
 }
 
 export default function AutomationsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [automationData, setAutomationData] = useState<AutomationData | null>(null);
   const [registeredAutomations, setRegisteredAutomations] = useState<RegisteredAutomation[]>([]);
@@ -288,7 +290,7 @@ export default function AutomationsPage() {
                     </p>
                     <Button
                       variant="outline"
-                      onClick={() => window.location.href = '/settings'}
+                      onClick={() => router.push('/settings')}
                     >
                       Go to Settings
                     </Button>
