@@ -152,16 +152,18 @@ export async function POST(request: NextRequest) {
         await fs.writeFile(configPath, mergedConfig, 'utf-8');
         console.log('Wrote configuration.yaml');
 
-        // Restart HA to load all new configuration
         // YAML-configured entities (input_number, utility_meter, template, rest_command)
-        // require a restart to be created - automation.reload is not sufficient
-        try {
-          console.log('Restarting Home Assistant to load new configuration...');
-          await haClient.callService('homeassistant', 'restart', {});
-          console.log('HA restart initiated');
-        } catch (restartError) {
-          console.error('Failed to restart HA:', restartError);
-          // Not fatal - user can restart HA manually
+        // require a restart to be created - automation.reload is not sufficient.
+        // In embedded mode, restart automatically (dedicated HA instance, nothing else running).
+        // In addon mode, let the user decide when to restart (other integrations may be affected).
+        if (isEmbeddedMode()) {
+          try {
+            console.log('Restarting Home Assistant to load new configuration...');
+            await haClient.callService('homeassistant', 'restart', {});
+            console.log('HA restart initiated');
+          } catch {
+            console.log('HA restart initiated (connection dropped as expected)');
+          }
         }
 
         // Register one automation record per printer
@@ -220,11 +222,15 @@ export async function POST(request: NextRequest) {
           details: { printers: printers.map(p => p.name), trayIds: allTrayIds },
         });
 
+        const addonMode = isAddonMode();
         return NextResponse.json({
           success: true,
           printerCount: config.printerCount,
           trayCount: config.trayCount,
-          message: 'Home Assistant configured successfully. HA is restarting to apply changes - this may take a minute.',
+          needsRestart: addonMode,
+          message: addonMode
+            ? `Configuration written for ${config.printerCount} printer(s), ${config.trayCount} tray(s). Home Assistant restart required to apply changes.`
+            : `Configured ${config.trayCount} trays successfully. HA is restarting to apply changes.`,
         });
 
       } catch (writeError) {
@@ -233,6 +239,30 @@ export async function POST(request: NextRequest) {
           error: `Failed to write configuration files: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`,
         }, { status: 500 });
       }
+    }
+
+    if (action === 'restart-ha') {
+      // Restart Home Assistant on user request
+      if (!isEmbeddedMode() && !isAddonMode()) {
+        return NextResponse.json({
+          error: 'Restart is only available in embedded or add-on mode',
+        }, { status: 400 });
+      }
+
+      console.log('User requested Home Assistant restart...');
+      try {
+        await haClient.callService('homeassistant', 'restart', {});
+      } catch {
+        // Expected: HA goes down immediately on restart, so the HTTP
+        // connection drops before a response is sent (504, ECONNRESET, etc).
+        // This confirms the restart is working, not an actual failure.
+        console.log('HA restart initiated (connection dropped as expected)');
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Home Assistant is restarting. This may take a minute.',
+      });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

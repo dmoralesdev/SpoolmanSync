@@ -5,6 +5,13 @@ import { Nav } from '@/components/nav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 interface AutomationData {
@@ -35,6 +42,8 @@ export default function AutomationsPage() {
   const [printerCount, setPrinterCount] = useState<number | null>(null);
   const [checkingPrinters, setCheckingPrinters] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [showRestartModal, setShowRestartModal] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   useEffect(() => {
     fetchRegistered();
@@ -97,13 +106,42 @@ export default function AutomationsPage() {
         throw new Error(data.error || 'Failed to configure automations');
       }
 
-      toast.success(data.message || `Configured ${data.trayCount} trays successfully`);
       setConfigured(true);
       fetchRegistered();
+
+      if (data.needsRestart) {
+        setShowRestartModal(true);
+      } else {
+        toast.success(data.message || `Configured ${data.trayCount} trays successfully`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to configure');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const restartHA = async () => {
+    setRestarting(true);
+    try {
+      const res = await fetch('/api/automations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restart-ha' }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to restart Home Assistant');
+      }
+
+      setShowRestartModal(false);
+      toast.success('Home Assistant is restarting. This may take a minute.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to restart');
+    } finally {
+      setRestarting(false);
     }
   };
 
@@ -330,6 +368,38 @@ export default function AutomationsPage() {
               </Card>
             )}
           </div>
+
+          {/* Restart Required Modal */}
+          <Dialog open={showRestartModal} onOpenChange={setShowRestartModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Home Assistant Restart Required</DialogTitle>
+                <DialogDescription>
+                  The automation configuration has been written successfully. Home Assistant needs to restart to load the new configuration (helper entities, templates, and automations).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={restartHA}
+                  disabled={restarting}
+                  className="flex-1"
+                >
+                  {restarting ? 'Restarting...' : 'Restart Now'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRestartModal(false)}
+                  disabled={restarting}
+                  className="flex-1"
+                >
+                  Restart Later
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                If you choose to restart later, you can restart Home Assistant from its own Settings page when convenient.
+              </p>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     );
