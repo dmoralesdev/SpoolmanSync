@@ -5,6 +5,20 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-02-17
+
+### Added
+- **"Remaining" weight badge** on dashboard tray slots showing filament remaining
+- **Multi-color filament display** across all spool color swatches (dashboard, tray dialog, scan pages)
+- **Expand/collapse toggle** for spool list in the QR label generator
+
+### Fixed
+- Remove printer button no longer deletes the printer from ha-bambulab — now only removes it from SpoolmanSync with the ability to re-add (#25)
+- "Go to Settings" button on automations page navigated to a 404 in add-on mode (ingress path issue)
+- Dashboard, automations discovery, and auto-configure now correctly filter out printers removed from SpoolmanSync
+- HA restart after automation configuration in add-on mode now prompts user instead of restarting without warning
+- Responsive UI improvements for logs filter buttons, tray "Remaining" badge, and label sheet print settings on small screens
+
 ## [1.2.0] - 2026-02-17
 
 ### Added
