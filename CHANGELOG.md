@@ -5,6 +5,14 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-02-22
+
+### Added
+- **AMS filament info in unassigned tray banner** — the "Assign Spools to Trays" alert now shows the material, name, and color reported by the AMS for each unassigned tray, making it easier to find the matching Spoolman spool (#15)
+
+### Fixed
+- Generated REST command webhook URL in add-on mode now uses the configured port instead of hardcoded 3000 (#26)
+
 ## [1.2.1] - 2026-02-17
 
 ### Added
