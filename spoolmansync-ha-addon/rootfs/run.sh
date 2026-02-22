@@ -24,8 +24,18 @@ fi
 export DIRECT_ACCESS_PORT="$DIRECT_PORT"
 echo "Direct access port: $DIRECT_PORT"
 
-# Update nginx config with the configured port
+# Derive internal Next.js port from direct port (+1) to avoid conflicts on host_network
+INTERNAL_PORT=$((DIRECT_PORT + 1))
+# Avoid colliding with the ingress port (8099)
+if [ "$INTERNAL_PORT" -eq 8099 ]; then
+    INTERNAL_PORT=8100
+fi
+export PORT="$INTERNAL_PORT"
+echo "Internal Next.js port: $INTERNAL_PORT"
+
+# Update nginx config with the configured ports
 sed -i "s/listen 3000;/listen ${DIRECT_PORT};/" /etc/nginx/http.d/default.conf
+sed -i "s/127.0.0.1:3001/127.0.0.1:${INTERNAL_PORT}/g" /etc/nginx/http.d/default.conf
 
 # Supervisor token is automatically available
 if [ -n "$SUPERVISOR_TOKEN" ]; then
@@ -45,11 +55,11 @@ echo "Migrations complete."
 
 # Start nginx in background
 # nginx serves the configured direct access port and port 8099 (HA ingress)
-# Both proxy to the internal Next.js server on port 3001
+# Both proxy to the internal Next.js server
 echo "Starting nginx on ports ${DIRECT_PORT} and 8099..."
 nginx -g 'daemon off;' &
 
-# Start the Next.js server on internal port (3001)
+# Start the Next.js server on internal port
 # Bound to 127.0.0.1 - only accessible via nginx, not directly from outside
-echo "Starting Next.js server on port ${PORT:-3001}..."
+echo "Starting Next.js server on port ${PORT}..."
 exec node server.js

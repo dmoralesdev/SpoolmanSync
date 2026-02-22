@@ -57,7 +57,6 @@ RUN chmod a+x /run.sh
 
 EXPOSE 3000 8099
 
-ENV PORT=3001
 ENV HOSTNAME="127.0.0.1"
 ENV DATABASE_URL="file:/data/spoolmansync.db"
 
