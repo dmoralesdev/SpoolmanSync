@@ -133,8 +133,9 @@ export async function POST(request: NextRequest) {
       // Generate webhook URL
       // Addon mode: host networking, HA Core and addon share localhost
       // Embedded mode: Docker network hostname
+      const addonPort = process.env.DIRECT_ACCESS_PORT || '3000';
       const internalWebhookUrl = isAddonMode()
-        ? 'http://127.0.0.1:3000/api/webhook'
+        ? `http://127.0.0.1:${addonPort}/api/webhook`
         : 'http://spoolmansync-app:3000/api/webhook';
 
       // Generate configuration
