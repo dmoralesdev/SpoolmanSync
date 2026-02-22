@@ -19,6 +19,8 @@ interface PrinterWithSpools extends HAPrinter {
       entity_id: string;
       tray_number: number;
       name?: string; // Filament name from printer, "Empty" if no filament loaded
+      material?: string;
+      color?: string;
       assigned_spool?: Spool;
       [key: string]: unknown;
     }>;
@@ -45,9 +47,9 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   // Track trays that have filament loaded but no spool assigned
-  // Returns both count and list of specific tray identifiers
+  // Returns list with tray label and AMS-reported filament info
   const unassignedTrays = useMemo(() => {
-    const trays: string[] = [];
+    const trays: { label: string; name?: string; material?: string; color?: string }[] = [];
     for (const printer of printers) {
       for (const ams of printer.ams_units) {
         for (const tray of ams.trays) {
@@ -59,7 +61,12 @@ export default function Dashboard() {
           if (hasFilament && !tray.assigned_spool) {
             // Format: "AMS 1 Tray 3" or just "Tray 3" if only one AMS
             const amsPrefix = printer.ams_units.length > 1 ? `${ams.name} ` : '';
-            trays.push(`${amsPrefix}Tray ${tray.tray_number}`);
+            trays.push({
+              label: `${amsPrefix}Tray ${tray.tray_number}`,
+              name: tray.name,
+              material: tray.material,
+              color: tray.color,
+            });
           }
         }
       }
@@ -341,13 +348,31 @@ export default function Dashboard() {
                 </svg>
                 <AlertTitle>Assign Spools to Trays</AlertTitle>
                 <AlertDescription>
-                  {unassignedTrays.length === 1 ? (
-                    <>{unassignedTrays[0]} has filament but no assigned spool.</>
-                  ) : (
-                    <>{unassignedTrays.join(', ')} have filament but no assigned spools.</>
-                  )}
-                  {' '}Click on the tray card below to select which Spoolman spool is loaded.
-                  This ensures accurate filament tracking when prints complete.
+                  <div className="space-y-1">
+                    {unassignedTrays.map((tray, i) => {
+                      const details = [tray.material, tray.name].filter(Boolean).join(' - ');
+                      return (
+                        <div key={i}>
+                          <strong>{tray.label}</strong> has filament but no assigned spool.
+                          {details && (
+                            <span>
+                              {' '}AMS reports: {details}
+                              {tray.color && (
+                                <span
+                                  className="inline-block w-3 h-3 rounded-full ml-1 align-middle border border-border"
+                                  style={{ backgroundColor: tray.color.startsWith('#') ? tray.color.substring(0, 7) : `#${tray.color.substring(0, 6)}` }}
+                                />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="mt-1">
+                      Click on the tray card below to select which Spoolman spool is loaded.
+                      This ensures accurate filament tracking when prints complete.
+                    </div>
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
