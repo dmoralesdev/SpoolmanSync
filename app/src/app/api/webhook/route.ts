@@ -19,6 +19,15 @@ import { createActivityLog } from '@/lib/activity-log';
  *   remaining_weight: 800
  * }
  */
+
+/** Returns true if tray_uuid is a real Bambu spool serial (not empty, unknown, or all zeros) */
+function isValidTrayUuid(tray_uuid: string | undefined | null): boolean {
+  if (!tray_uuid || tray_uuid === 'unknown' || tray_uuid === '') return false;
+  // ha-bambulab reports all zeros for non-Bambu spools without RFID tags
+  if (tray_uuid.replace(/0/g, '') === '') return false;
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -70,7 +79,7 @@ export async function POST(request: NextRequest) {
       // tray_uuid is the Bambu spool serial number, unique per physical spool
       // (unlike tag_uid which differs per RFID tag - each spool has 2 tags)
       let tagStored = false;
-      if (tray_uuid && tray_uuid !== 'unknown' && tray_uuid !== '') {
+      if (isValidTrayUuid(tray_uuid)) {
         // Check if this spool already has this serial number stored
         const existingTagRaw = matchedSpool.extra?.['tag'];
         let alreadyHasTag = false;
@@ -188,7 +197,7 @@ export async function POST(request: NextRequest) {
 
       // Tray has filament - try to auto-match by spool serial number
       // Uses the `tag` field (stored on first spool_usage)
-      if (tray_uuid && tray_uuid !== 'unknown' && tray_uuid !== '') {
+      if (isValidTrayUuid(tray_uuid)) {
         const matchedSpool = await client.findSpoolByTag(tray_uuid);
 
         if (matchedSpool) {
