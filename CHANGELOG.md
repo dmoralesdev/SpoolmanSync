@@ -5,6 +5,11 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-02-22
+
+### Fixed
+- No longer store or auto-match against all-zero spool serial numbers from non-Bambu spools (#15)
+
 ## [1.2.3] - 2026-02-22
 
 ### Fixed
