@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -117,6 +117,26 @@ function NumberInput({
   step?: number;
   suffix?: string;
 }) {
+  const [localValue, setLocalValue] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+
+  // Sync from props when not actively editing
+  useEffect(() => {
+    if (!editing) setLocalValue(String(value));
+  }, [value, editing]);
+
+  const handleBlur = () => {
+    setEditing(false);
+    const v = parseFloat(localValue);
+    if (!isNaN(v)) {
+      const clamped = Math.max(min, Math.min(max, v));
+      onChange(clamped);
+      setLocalValue(String(clamped));
+    } else {
+      setLocalValue(String(value));
+    }
+  };
+
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
@@ -126,10 +146,17 @@ function NumberInput({
           min={min}
           max={max}
           step={step}
-          value={value}
+          value={localValue}
+          onFocus={() => setEditing(true)}
           onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)));
+            const raw = e.target.value;
+            setLocalValue(raw);
+            const v = parseFloat(raw);
+            if (!isNaN(v) && v >= min && v <= max) onChange(v);
+          }}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           }}
           className="h-8 text-xs"
         />
