@@ -33,6 +33,7 @@ SpoolmanSync automatically tracks which filament spools are loaded in your Bambu
 - **QR Code Scanning** - Scan Spoolman QR codes or custom barcodes to quickly look up and assign spools
 - **QR Label Generation** - Create and print QR code labels for your spools. Scan with your phone camera to quickly assign to AMS trays
 - **NFC Tag Writing** - Write spool links to NFC sticker tags. Tap with your phone to assign spools (Android only: Chrome, Edge, Opera, Samsung Internet)
+- **Kiosk Mode** - Touch-optimized interface for small screens with USB NFC/RFID readers (e.g., Raspberry Pi kiosk setups)
 - **AMS 2 Pro & AMS HT Support** - Works with all AMS hardware variants
 - **Bambu Cloud Login** - Add printers by logging in with your Bambu Cloud account
 - **Home Assistant Add-on** - Install directly from the HA add-on store with sidebar integration
@@ -231,6 +232,14 @@ docker compose --profile external up -d     # Start
 3. **Automatic Sync**: When Home Assistant automations detect tray changes, they call the SpoolmanSync webhook with tray information (color, material, tag UID). SpoolmanSync matches this to spools in Spoolman and updates the `active_tray` extra field.
 
 4. **Spoolman Integration**: All spool assignments are stored in Spoolman's `extra` field as `active_tray`, making it compatible with other Spoolman integrations.
+
+---
+
+## Kiosk Mode
+
+SpoolmanSync includes an optional kiosk mode for users who want a dedicated spool-scanning station — for example, a Raspberry Pi with a small touchscreen and USB NFC reader mounted next to their printer.
+
+Navigate to `/kiosk` and click **Enable Kiosk Mode**. This sets a browser cookie that switches the spool assignment page to a touch-optimized layout with large tray buttons. Only the browser where you enable it is affected — all other devices see the normal UI. You can exit kiosk mode at any time via the link at the bottom of the screen.
 
 ---
 

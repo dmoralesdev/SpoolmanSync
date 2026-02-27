@@ -1,0 +1,154 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Nfc, MonitorSmartphone } from 'lucide-react';
+import { isKioskMode, enableKioskMode, disableKioskMode } from '@/lib/kiosk';
+
+function extractSpoolId(input: string): string | null {
+  const trimmed = input.trim();
+
+  // SpoolmanSync URL: /scan/spool/ID
+  const syncMatch = trimmed.match(/\/scan\/spool\/(\d+)/i);
+  if (syncMatch) return syncMatch[1];
+
+  // Spoolman QR: web+spoolman:s-ID
+  const spoolmanMatch = trimmed.match(/web\+spoolman:s-(\d+)/i);
+  if (spoolmanMatch) return spoolmanMatch[1];
+
+  // Spoolman URL: /spool/show/ID
+  const urlMatch = trimmed.match(/\/spool\/show\/(\d+)/i);
+  if (urlMatch) return urlMatch[1];
+
+  // Plain number
+  if (/^\d+$/.test(trimmed)) return trimmed;
+
+  return null;
+}
+
+export default function KioskPage() {
+  const router = useRouter();
+  const [enabled, setEnabled] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [scanInput, setScanInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setEnabled(isKioskMode());
+    setChecking(false);
+  }, []);
+
+  // Keep input focused in kiosk idle mode
+  useEffect(() => {
+    if (!enabled) return;
+    const refocus = () => inputRef.current?.focus();
+    refocus();
+    const interval = setInterval(refocus, 1000);
+    return () => clearInterval(interval);
+  }, [enabled]);
+
+  const handleEnable = () => {
+    enableKioskMode();
+    setEnabled(true);
+  };
+
+  const handleExit = () => {
+    disableKioskMode();
+    router.push('/');
+  };
+
+  const handleScanSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const spoolId = extractSpoolId(scanInput);
+      if (spoolId) {
+        setScanInput('');
+        router.push(`/scan/spool/${spoolId}`);
+      } else {
+        setScanInput('');
+      }
+    },
+    [scanInput, router]
+  );
+
+  if (checking) return null;
+
+  // Setup screen — explain kiosk mode and let user opt in
+  if (!enabled) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <MonitorSmartphone className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+            <CardTitle>Kiosk Mode</CardTitle>
+            <CardDescription>
+              Optimized for small touchscreens with NFC/RFID readers. Provides a
+              simplified interface for scanning spools and assigning them to
+              printer trays.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p>When enabled on this device:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  Spool assignment pages use large, touch-friendly buttons
+                </li>
+                <li>Navigation is simplified for kiosk use</li>
+                <li>
+                  Only affects this browser — other devices are unchanged
+                </li>
+              </ul>
+            </div>
+            <Button onClick={handleEnable} className="w-full" size="lg">
+              Enable Kiosk Mode
+            </Button>
+            <button
+              onClick={() => router.push('/')}
+              className="block w-full text-center text-sm text-muted-foreground hover:text-foreground"
+            >
+              Go back
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Idle screen — waiting for NFC scan
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
+      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm">
+        <Nfc className="h-[clamp(3rem,15vw,6rem)] w-[clamp(3rem,15vw,6rem)] text-muted-foreground/50 mb-[clamp(0.5rem,3vw,1.5rem)]" />
+        <h1 className="text-[clamp(1.25rem,5vw,2rem)] font-bold text-center mb-[clamp(0.25rem,1.5vw,0.5rem)]">
+          Scan a Spool
+        </h1>
+        <p className="text-[clamp(0.75rem,3vw,1rem)] text-muted-foreground text-center mb-[clamp(1rem,4vw,2rem)]">
+          Hold an NFC-tagged spool near the reader
+        </p>
+        <form onSubmit={handleScanSubmit} className="w-full">
+          <Input
+            ref={inputRef}
+            value={scanInput}
+            onChange={(e) => setScanInput(e.target.value)}
+            placeholder="Waiting for scan..."
+            className="text-center text-[clamp(0.875rem,3.5vw,1.125rem)] h-[clamp(2.5rem,8vw,3rem)]"
+            autoFocus
+          />
+        </form>
+        <p className="text-[clamp(0.625rem,2vw,0.75rem)] text-muted-foreground/50 mt-[clamp(0.5rem,2vw,1rem)] text-center">
+          Or type a spool ID and press Enter
+        </p>
+      </div>
+      <button
+        onClick={handleExit}
+        className="text-[clamp(0.625rem,2.5vw,0.75rem)] text-muted-foreground/40 hover:text-muted-foreground py-[clamp(0.5rem,2vw,1rem)]"
+      >
+        Exit Kiosk Mode
+      </button>
+    </div>
+  );
+}

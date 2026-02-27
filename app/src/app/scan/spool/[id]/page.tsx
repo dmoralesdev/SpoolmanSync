@@ -15,9 +15,10 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { SpoolColorSwatch } from '@/components/spool-color-swatch';
 import type { Spool } from '@/lib/api/spoolman';
+import { isKioskMode, disableKioskMode } from '@/lib/kiosk';
 import Link from 'next/link';
 
 interface TrayOption {
@@ -38,7 +39,14 @@ export default function SpoolAssignPage({
   const [trays, setTrays] = useState<TrayOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
+  const [pendingTrayId, setPendingTrayId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [kioskMode, setKioskMode] = useState(false);
+  const [kioskSuccess, setKioskSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setKioskMode(isKioskMode());
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -116,6 +124,7 @@ export default function SpoolAssignPage({
     if (!spool) return;
 
     setAssigning(true);
+    setPendingTrayId(tray.id);
     try {
       const res = await fetch('/api/spools', {
         method: 'POST',
@@ -125,15 +134,152 @@ export default function SpoolAssignPage({
 
       if (!res.ok) throw new Error('Failed to assign spool');
 
-      toast.success('Spool assigned successfully!');
-      // Auto-redirect to dashboard after successful assignment
-      router.push('/');
+      if (kioskMode) {
+        const trayLabel = tray.amsName ? `${tray.amsName} — ${tray.label}` : tray.label;
+        setKioskSuccess(trayLabel);
+        setTimeout(() => router.push('/kiosk'), 1500);
+      } else {
+        toast.success('Spool assigned successfully!');
+        router.push('/');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to assign');
       setAssigning(false);
+      setPendingTrayId(null);
     }
   };
 
+  // Kiosk mode — success screen
+  if (kioskMode && kioskSuccess) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-[clamp(1rem,4vw,2rem)]">
+        <CheckCircle2 className="h-[clamp(3rem,15vw,5rem)] w-[clamp(3rem,15vw,5rem)] text-green-500 mb-[clamp(0.5rem,2vw,1rem)]" />
+        <h1 className="text-[clamp(1.25rem,5vw,2rem)] font-bold text-center text-green-500">
+          Assigned!
+        </h1>
+        <p className="text-[clamp(0.75rem,3vw,1rem)] text-muted-foreground text-center mt-[clamp(0.25rem,1vw,0.5rem)]">
+          {spool?.filament.name || spool?.filament.material} &rarr; {kioskSuccess}
+        </p>
+      </div>
+    );
+  }
+
+  // Kiosk mode — touch-optimized layout
+  if (kioskMode) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col p-[clamp(0.75rem,3vw,1.5rem)]">
+        {/* Loading */}
+        {loading && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+            <p className="text-[clamp(0.875rem,3.5vw,1.125rem)] text-destructive">{error}</p>
+            <a
+              href="/kiosk"
+              className="text-[clamp(0.75rem,3vw,0.875rem)] text-primary hover:underline"
+            >
+              Back to scanner
+            </a>
+          </div>
+        )}
+
+        {/* Main content */}
+        {!loading && !error && spool && (
+          <>
+            {/* Spool Info */}
+            <div className="flex items-center gap-[clamp(0.5rem,2vw,0.75rem)] p-[clamp(0.5rem,2vw,0.75rem)] rounded-lg border bg-muted/50 mb-[clamp(0.75rem,3vw,1rem)]">
+              <SpoolColorSwatch filament={spool.filament} size="h-12 w-12" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[clamp(0.875rem,3.5vw,1.25rem)] font-semibold truncate">
+                  {spool.filament.vendor?.name ? `${spool.filament.vendor.name} ` : ''}
+                  {spool.filament.name || spool.filament.material}
+                </p>
+                <p className="text-[clamp(0.625rem,2.5vw,0.875rem)] text-muted-foreground">
+                  {spool.filament.material} &bull; #{spool.id} &bull;{' '}
+                  {Math.round(spool.remaining_weight)}g
+                </p>
+              </div>
+            </div>
+
+            {/* Tray Grid */}
+            {trays.length > 0 ? (
+              <>
+                <h2 className="text-[clamp(0.75rem,3vw,1rem)] font-medium text-muted-foreground mb-[clamp(0.5rem,2vw,0.75rem)]">
+                  Assign to tray:
+                </h2>
+                <div className="grid grid-cols-2 gap-[clamp(0.5rem,2vw,0.75rem)] flex-1 auto-rows-fr">
+                  {trays.map((tray) => (
+                    <button
+                      key={tray.id}
+                      onClick={() => handleAssign(tray)}
+                      disabled={assigning}
+                      className="flex flex-col items-center justify-center rounded-xl border-2 border-border p-[clamp(0.75rem,3vw,1.25rem)] transition-colors hover:border-primary hover:bg-accent active:bg-accent disabled:opacity-50"
+                    >
+                      {assigning && pendingTrayId === tray.id ? (
+                        <Loader2 className="h-[clamp(1.25rem,5vw,1.75rem)] w-[clamp(1.25rem,5vw,1.75rem)] animate-spin text-muted-foreground" />
+                      ) : (
+                        <>
+                          <span className="text-[clamp(1rem,4vw,1.5rem)] font-semibold">
+                            {tray.label}
+                          </span>
+                          {tray.amsName && (
+                            <span className="text-[clamp(0.625rem,2.5vw,0.875rem)] text-muted-foreground">
+                              {tray.amsName}
+                            </span>
+                          )}
+                          <span className="text-[clamp(0.5rem,2vw,0.75rem)] text-muted-foreground/70 mt-0.5">
+                            {tray.printer}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+                <p className="text-[clamp(0.75rem,3vw,0.875rem)] text-muted-foreground">
+                  No printers or trays found.
+                </p>
+                <a
+                  href="/kiosk"
+                  className="text-[clamp(0.75rem,3vw,0.875rem)] text-primary hover:underline"
+                >
+                  Back to scanner
+                </a>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-[clamp(0.5rem,2vw,0.75rem)] mt-auto">
+          <a
+            href="/kiosk"
+            className="text-[clamp(0.625rem,2.5vw,0.75rem)] text-muted-foreground/60 hover:text-muted-foreground"
+          >
+            &larr; Back
+          </a>
+          <button
+            onClick={() => {
+              disableKioskMode();
+              window.location.href = '/';
+            }}
+            className="text-[clamp(0.625rem,2.5vw,0.75rem)] text-muted-foreground/40 hover:text-muted-foreground"
+          >
+            Exit Kiosk Mode
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal mode
   return (
     <div className="min-h-screen bg-background">
       <Nav />
