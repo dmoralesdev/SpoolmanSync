@@ -235,7 +235,7 @@ export function UsageOverTime({ data, spools, bucket }: UsageOverTimeProps) {
                   spoolIdsInData.map(id => (
                       <Area
                         key={id}
-                        type="monotone"
+                        type="linear"
                         dataKey={`spool_${id}`}
                         stackId="1"
                         stroke={theme.text}
