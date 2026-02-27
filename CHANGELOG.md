@@ -5,6 +5,18 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-27
+
+### Added
+- **Filament usage reporting dashboard** — New Reports page with summary cards, per-spool bar chart with filament color fills, stacked area chart for usage over time, and detail table. Filter by time period (7d, 30d, 90d, 1y, all) with automatic daily/weekly bucketing (#22)
+- **Kiosk mode** — Touch-optimized interface at `/kiosk` for small screens with USB NFC/RFID readers (e.g., Raspberry Pi kiosk setups). Cookie-based opt-in, zero impact on normal users (#29)
+- **App version display** — Version number shown in footer on all pages (#30)
+
+### Fixed
+- Null vendor on filaments no longer crashes the dashboard (#31)
+- Number input fields in QR label settings no longer clamp values on every keystroke, allowing multi-digit entry (#32)
+- Stacked area chart in usage report uses linear interpolation to prevent visual crossing artifacts
+
 ## [1.2.4] - 2026-02-22
 
 ### Fixed
