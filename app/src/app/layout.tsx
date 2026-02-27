@@ -39,6 +39,9 @@ export default async function RootLayout({
         <Providers>
           {ingressPath && <IngressPatcher ingressPath={ingressPath} />}
           {children}
+          <footer className="w-full py-3 text-center text-xs text-muted-foreground/50">
+            SpoolmanSync v{process.env.APP_VERSION}
+          </footer>
           <Toaster />
         </Providers>
       </body>
