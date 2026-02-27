@@ -379,7 +379,7 @@ export function QRCodeGenerator({ spools, directAccessPort }: QRCodeGeneratorPro
                         {spool.filament.name || spool.filament.material}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {spool.filament.vendor.name} • #{spool.id}
+                        {spool.filament.vendor?.name ? `${spool.filament.vendor.name} • ` : ''}#{spool.id}
                       </p>
                     </div>
                     <Badge variant="secondary" className="flex-shrink-0">

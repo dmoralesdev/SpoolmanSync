@@ -231,7 +231,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-[9px] font-medium text-muted-foreground uppercase">Vendor:</span>
-                  <span className="text-xs font-medium truncate">{assignedSpool.filament.vendor.name}</span>
+                  <span className="text-xs font-medium truncate">{assignedSpool.filament.vendor?.name || 'Unknown'}</span>
                 </div>
               </div>
 
@@ -373,7 +373,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
                       {spool.filament.name || spool.filament.material}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {spool.filament.vendor.name} • {spool.filament.material} • {Math.round(spool.remaining_weight)}g
+                      {spool.filament.vendor?.name ? `${spool.filament.vendor.name} • ` : ''}{spool.filament.material} • {Math.round(spool.remaining_weight)}g
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground">

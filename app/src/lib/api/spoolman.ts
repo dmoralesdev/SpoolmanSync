@@ -11,7 +11,7 @@ export interface Vendor {
 export interface Filament {
   id: number;
   name: string;
-  vendor: Vendor;
+  vendor: Vendor | null;
   material: string;
   color_hex: string | null;
   multi_color_hexes: string | null;

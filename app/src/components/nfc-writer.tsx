@@ -336,7 +336,7 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
                     {spool.filament.name || spool.filament.material}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {spool.filament.vendor.name} • #{spool.id}
+                    {spool.filament.vendor?.name ? `${spool.filament.vendor.name} • ` : ''}#{spool.id}
                   </p>
                 </div>
                 <Badge variant="secondary" className="flex-shrink-0">
@@ -356,7 +356,7 @@ export function NFCWriter({ spools, directAccessPort }: NFCWriterProps) {
             <SpoolColorSwatch filament={selectedSpool.filament} size="h-10 w-10" />
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">
-                {selectedSpool.filament.vendor.name} {selectedSpool.filament.name}
+                {selectedSpool.filament.vendor?.name} {selectedSpool.filament.name}
               </p>
               <p className="text-sm text-muted-foreground">
                 {selectedSpool.filament.material} • Spool #{selectedSpool.id}

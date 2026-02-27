@@ -178,7 +178,7 @@ export default function SpoolAssignPage({
                   Spool #{spool.id}
                 </CardTitle>
                 <CardDescription>
-                  {spool.filament.vendor.name} {spool.filament.name}
+                  {spool.filament.vendor?.name} {spool.filament.name}
                 </CardDescription>
               </CardHeader>
               <CardContent>
