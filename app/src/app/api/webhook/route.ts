@@ -3,6 +3,7 @@ import prisma from '@/lib/db';
 import { SpoolmanClient } from '@/lib/api/spoolman';
 import { spoolEvents, SPOOL_UPDATED, SpoolUpdateEvent } from '@/lib/events';
 import { createActivityLog } from '@/lib/activity-log';
+import { checkAndUpdateAlerts } from '@/lib/alerts';
 
 /**
  * Webhook endpoint for Home Assistant automations
@@ -71,6 +72,9 @@ export async function POST(request: NextRequest) {
 
       // Deduct the used weight from the spool
       await client.useWeight(matchedSpool.id, used_weight);
+
+      // Check low filament alerts (fire-and-forget)
+      checkAndUpdateAlerts().catch(err => console.error('Alert check failed:', err));
 
       console.log(`Deducted ${used_weight}g from spool #${matchedSpool.id} (${matchedSpool.filament.name})`);
 

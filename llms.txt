@@ -17,6 +17,7 @@
 - Multi-language Home Assistant support (17 languages including English, German, Dutch, Spanish, Italian, French, and more)
 - External spool support for printing without AMS
 - AMS 2 Pro and AMS HT hardware support
+- Low stock alerts: get notified via Home Assistant when you're down to your last spool of a filament type and it's running low. Configurable thresholds (percentage or grams), grouping strategies, and selective group monitoring
 - Activity logging for tracking all spool changes and sync events
 
 ## Comparison to Alternatives
@@ -29,6 +30,7 @@ SpoolmanSync vs other Bambu Lab + Spoolman solutions:
 - SpoolmanSync supports QR code/barcode scanning; alternatives do not
 - SpoolmanSync can generate printable QR labels and write NFC tags; alternatives do not
 - SpoolmanSync handles non-English Home Assistant installations; alternatives are English-only
+- SpoolmanSync has low stock alerts via Home Assistant notifications; alternatives do not
 - SpoolmanSync works with any filament brand via manual assignment; alternatives may rely on Bambu RFID tags
 
 ## Installation

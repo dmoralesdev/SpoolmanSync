@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import type { HAPrinter } from '@/lib/api/homeassistant';
 import type { Spool } from '@/lib/api/spoolman';
+import type { ActiveAlert } from '@/lib/alerts';
 import Link from 'next/link';
 
 interface PrinterWithSpools extends HAPrinter {
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [printers, setPrinters] = useState<PrinterWithSpools[]>([]);
   const [spools, setSpools] = useState<Spool[]>([]);
+  const [lowFilamentAlerts, setLowFilamentAlerts] = useState<ActiveAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,9 +86,10 @@ export default function Dashboard() {
 
       // Only fetch printers and spools if both services are configured
       if (settingsData.homeassistant && settingsData.spoolman) {
-        const [printersRes, spoolsRes] = await Promise.all([
+        const [printersRes, spoolsRes, alertsRes] = await Promise.all([
           fetch('/api/printers'),
           fetch('/api/spools'),
+          fetch('/api/alerts'),
         ]);
 
         if (printersRes.ok) {
@@ -97,6 +100,11 @@ export default function Dashboard() {
         if (spoolsRes.ok) {
           const spoolsData = await spoolsRes.json();
           setSpools(spoolsData.spools || []);
+        }
+
+        if (alertsRes.ok) {
+          const alertsData = await alertsRes.json();
+          setLowFilamentAlerts(alertsData.alerts || []);
         }
       }
     } catch (err) {
@@ -158,6 +166,8 @@ export default function Dashboard() {
           fetchData();
         } else if (data.type === 'tray_change') {
           fetchData();
+        } else if (data.type === 'alert_update') {
+          setLowFilamentAlerts(data.alerts || []);
         }
       } catch (err) {
         console.error('Error parsing SSE message:', err);
@@ -371,6 +381,54 @@ export default function Dashboard() {
                     <div className="mt-1">
                       Click on the tray card below to select which Spoolman spool is loaded.
                       This ensures accurate filament tracking when prints complete.
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Low filament stock alert banner */}
+            {lowFilamentAlerts.length > 0 && (
+              <Alert variant="destructive">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+                <AlertTitle>Low Filament Stock</AlertTitle>
+                <AlertDescription>
+                  <div className="space-y-1">
+                    {lowFilamentAlerts.map((alert) => (
+                      <div key={alert.groupKey} className="flex items-center gap-2">
+                        {alert.color_hex && (
+                          <span
+                            className="inline-block w-3 h-3 rounded-full border border-border shrink-0"
+                            style={{ backgroundColor: alert.color_hex.startsWith('#') ? alert.color_hex : `#${alert.color_hex}` }}
+                          />
+                        )}
+                        <span>
+                          <strong>{alert.groupLabel}</strong>
+                          {' '}&mdash;{' '}
+                          {alert.spoolCount === 1
+                            ? `${alert.lowestRemaining}g remaining`
+                            : `${alert.spoolCount} spools, lowest: ${alert.lowestRemaining}g`
+                          }
+                          {alert.lowestPercentage > 0 && ` (${alert.lowestPercentage}%)`}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="mt-1">
+                      <Link href="/settings" className="underline hover:no-underline">
+                        Configure alerts in Settings
+                      </Link>
                     </div>
                   </div>
                 </AlertDescription>

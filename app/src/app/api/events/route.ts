@@ -1,4 +1,4 @@
-import { spoolEvents, SPOOL_UPDATED, ACTIVITY_LOG_CREATED, SpoolUpdateEvent, ActivityLogEvent } from '@/lib/events';
+import { spoolEvents, SPOOL_UPDATED, ACTIVITY_LOG_CREATED, ALERT_UPDATED, SpoolUpdateEvent, ActivityLogEvent } from '@/lib/events';
 
 /**
  * Server-Sent Events endpoint for real-time dashboard updates
@@ -50,6 +50,16 @@ export async function GET(): Promise<Response> {
         }
       });
 
+      // Subscribe to alert update events
+      const unsubscribeAlert = spoolEvents.on(ALERT_UPDATED, (data: unknown) => {
+        try {
+          const message = `data: ${JSON.stringify({ type: 'alert_update', alerts: data })}\n\n`;
+          controller.enqueue(encoder.encode(message));
+        } catch {
+          // Client disconnected, will be cleaned up
+        }
+      });
+
       // Send heartbeat every 30 seconds to keep connection alive
       const heartbeatInterval = setInterval(() => {
         try {
@@ -67,6 +77,7 @@ export async function GET(): Promise<Response> {
       const cleanup = () => {
         unsubscribeSpool();
         unsubscribeLog();
+        unsubscribeAlert();
         clearInterval(heartbeatInterval);
       };
 

@@ -24,6 +24,7 @@ SpoolmanSync automatically tracks which filament spools are loaded in your Bambu
 | Multi-AMS support | ✅ | Limited |
 | Non-English Home Assistant support | ✅ | ❌ |
 | Works with ANY filament brand | ✅ | Partial |
+| Low stock alerts | ✅ | ❌ |
 | Automatic filament usage tracking | ✅ | ✅ |
 
 ## Features
@@ -33,6 +34,7 @@ SpoolmanSync automatically tracks which filament spools are loaded in your Bambu
 - **QR Code Scanning** - Scan Spoolman QR codes or custom barcodes to quickly look up and assign spools
 - **QR Label Generation** - Create and print QR code labels for your spools. Scan with your phone camera to quickly assign to AMS trays
 - **NFC Tag Writing** - Write spool links to NFC sticker tags. Tap with your phone to assign spools (Android only: Chrome, Edge, Opera, Samsung Internet)
+- **Low Stock Alerts** - Get notified when you're down to your last spool of a filament type and it's running low. Sent as Home Assistant persistent notifications
 - **Kiosk Mode** - Touch-optimized interface for small screens with USB NFC/RFID readers (e.g., Raspberry Pi kiosk setups)
 - **AMS 2 Pro & AMS HT Support** - Works with all AMS hardware variants
 - **Bambu Cloud Login** - Add printers by logging in with your Bambu Cloud account
@@ -232,6 +234,23 @@ docker compose --profile external up -d     # Start
 3. **Automatic Sync**: When Home Assistant automations detect tray changes, they call the SpoolmanSync webhook with tray information (color, material, tag UID). SpoolmanSync matches this to spools in Spoolman and updates the `active_tray` extra field.
 
 4. **Spoolman Integration**: All spool assignments are stored in Spoolman's `extra` field as `active_tray`, making it compatible with other Spoolman integrations.
+
+---
+
+## Low Stock Alerts
+
+SpoolmanSync can notify you when you're running low on a particular filament and need to reorder. Alerts are sent as Home Assistant persistent notifications.
+
+**How it works:** An alert fires when you're down to your **last spool** of a filament group and that spool drops below your configured threshold. If you have 5 spools of black PETG and 4 are empty, no alert — you still have one good spool. Once that last spool drops below the threshold, you get notified.
+
+Configure alerts in **Settings** → **Low Filament Alerts**:
+
+- **Threshold type** — Percentage remaining or absolute weight (grams)
+- **Grouping strategy** — How spools are grouped to determine "last spool":
+  - **Material** — All PLA spools are one group, all PETG another
+  - **Material + Name** — Groups by filament product (e.g., "HF Black PETG" and "HF Blue PETG" are separate)
+  - **Material + Name + Vendor** — Same as above but distinguishes between vendors
+- **Selective monitoring** — Optionally monitor only specific groups instead of your entire inventory
 
 ---
 

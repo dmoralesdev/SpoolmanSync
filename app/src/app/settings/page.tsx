@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { AddPrinterDialog } from '@/components/add-printer-dialog';
+import type { AlertConfig, ActiveAlert, AvailableGroup } from '@/lib/alerts';
 
 interface FilterField {
   key: string;
@@ -76,6 +78,17 @@ function SettingsContent() {
   const [enabledFilters, setEnabledFilters] = useState<string[]>([]);
   const [savingFilters, setSavingFilters] = useState(false);
 
+  // Alert configuration states
+  const [alertConfig, setAlertConfig] = useState<AlertConfig>({
+    enabled: false,
+    thresholdType: 'percentage',
+    thresholdValue: 10,
+    groupingStrategy: 'material',
+  });
+  const [activeAlerts, setActiveAlerts] = useState<ActiveAlert[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<AvailableGroup[]>([]);
+  const [savingAlerts, setSavingAlerts] = useState(false);
+
   useEffect(() => {
     fetchSettings();
 
@@ -108,10 +121,11 @@ function SettingsContent() {
     }
   }, [settings?.homeassistant?.connected]);
 
-  // Fetch filter fields when Spoolman is connected
+  // Fetch filter fields and alert config when Spoolman is connected
   useEffect(() => {
     if (settings?.spoolman) {
       fetchFilterFields();
+      fetchAlertConfig();
     }
   }, [settings?.spoolman]);
 
@@ -361,6 +375,55 @@ function SettingsContent() {
       ? enabledFilters.filter((k) => k !== fieldKey)
       : [...enabledFilters, fieldKey];
     saveFilterConfig(newConfig);
+  };
+
+  const fetchAlertConfig = async () => {
+    try {
+      const res = await fetch('/api/alerts');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) setAlertConfig(data.config);
+        if (data.alerts) setActiveAlerts(data.alerts);
+        if (data.availableGroups) setAvailableGroups(data.availableGroups);
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const fetchAvailableGroups = async (strategy: string) => {
+    try {
+      const res = await fetch(`/api/alerts?strategy=${encodeURIComponent(strategy)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.availableGroups) setAvailableGroups(data.availableGroups);
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const saveAlertSettings = async () => {
+    setSavingAlerts(true);
+    try {
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alertConfig),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save alert settings');
+      }
+
+      const data = await res.json();
+      if (data.alerts) setActiveAlerts(data.alerts);
+      toast.success('Alert settings saved');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save alert settings');
+    } finally {
+      setSavingAlerts(false);
+    }
   };
 
   if (loading) {
@@ -835,6 +898,265 @@ function SettingsContent() {
                         </p>
                       )}
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* Low Filament Alerts */}
+          {settings?.spoolman && (
+            <>
+              <Separator />
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>Low Filament Alerts</CardTitle>
+                    {activeAlerts.length > 0 && (
+                      <Badge variant="destructive">{activeAlerts.length}</Badge>
+                    )}
+                  </div>
+                  <CardDescription>
+                    Get notified when you&apos;re down to your last spool of a filament type and it&apos;s running low.
+                    Alerts are checked after each print and sent as Home Assistant persistent notifications.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id="alerts-enabled"
+                      checked={alertConfig.enabled}
+                      onCheckedChange={(checked) =>
+                        setAlertConfig(prev => ({ ...prev, enabled: Boolean(checked) }))
+                      }
+                    />
+                    <Label htmlFor="alerts-enabled" className="cursor-pointer">
+                      Enable low filament alerts
+                    </Label>
+                  </div>
+
+                  {alertConfig.enabled && (
+                    <div className="space-y-4 pl-6">
+                      {/* Threshold type */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Threshold type</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="threshold-percentage"
+                              name="thresholdType"
+                              value="percentage"
+                              checked={alertConfig.thresholdType === 'percentage'}
+                              onChange={() => setAlertConfig(prev => ({ ...prev, thresholdType: 'percentage' }))}
+                              className="h-4 w-4"
+                            />
+                            <Label htmlFor="threshold-percentage" className="cursor-pointer text-sm">
+                              Percentage remaining
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="threshold-grams"
+                              name="thresholdType"
+                              value="grams"
+                              checked={alertConfig.thresholdType === 'grams'}
+                              onChange={() => setAlertConfig(prev => ({ ...prev, thresholdType: 'grams' }))}
+                              className="h-4 w-4"
+                            />
+                            <Label htmlFor="threshold-grams" className="cursor-pointer text-sm">
+                              Absolute weight (grams)
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Threshold value */}
+                      <div className="space-y-2">
+                        <Label htmlFor="threshold-value" className="text-sm font-medium">
+                          Alert when below {alertConfig.thresholdType === 'percentage' ? '(%)' : '(grams)'}
+                        </Label>
+                        <Input
+                          id="threshold-value"
+                          type="number"
+                          min="0"
+                          max={alertConfig.thresholdType === 'percentage' ? 100 : undefined}
+                          value={alertConfig.thresholdValue}
+                          onChange={(e) =>
+                            setAlertConfig(prev => ({ ...prev, thresholdValue: Number(e.target.value) }))
+                          }
+                          className="w-32"
+                        />
+                      </div>
+
+                      {/* Grouping strategy */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Group spools by</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-start space-x-2">
+                            <input
+                              type="radio"
+                              id="group-material"
+                              name="groupingStrategy"
+                              value="material"
+                              checked={alertConfig.groupingStrategy === 'material'}
+                              onChange={() => {
+                                setAlertConfig(prev => ({ ...prev, groupingStrategy: 'material', monitoredGroups: undefined }));
+                                fetchAvailableGroups('material');
+                              }}
+                              className="h-4 w-4 mt-0.5"
+                            />
+                            <div>
+                              <Label htmlFor="group-material" className="cursor-pointer text-sm">
+                                Material
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                Alert when all PLA spools are low, all PETG spools are low, etc.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <input
+                              type="radio"
+                              id="group-material-color"
+                              name="groupingStrategy"
+                              value="material_name"
+                              checked={alertConfig.groupingStrategy === 'material_name'}
+                              onChange={() => {
+                                setAlertConfig(prev => ({ ...prev, groupingStrategy: 'material_name', monitoredGroups: undefined }));
+                                fetchAvailableGroups('material_name');
+                              }}
+                              className="h-4 w-4 mt-0.5"
+                            />
+                            <div>
+                              <Label htmlFor="group-material-color" className="cursor-pointer text-sm">
+                                Material + Name
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                Alert per filament product (e.g. all HF Black PETG spools, all Matte White PLA spools).
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <input
+                              type="radio"
+                              id="group-material-vendor-name"
+                              name="groupingStrategy"
+                              value="material_name_vendor"
+                              checked={alertConfig.groupingStrategy === 'material_name_vendor'}
+                              onChange={() => {
+                                setAlertConfig(prev => ({ ...prev, groupingStrategy: 'material_name_vendor', monitoredGroups: undefined }));
+                                fetchAvailableGroups('material_name_vendor');
+                              }}
+                              className="h-4 w-4 mt-0.5"
+                            />
+                            <div>
+                              <Label htmlFor="group-material-vendor-name" className="cursor-pointer text-sm">
+                                Material + Name + Vendor
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                Like Material + Name, but distinguishes between vendors (e.g. Bambu Lab HF Black PETG vs Polymaker PolyLite Black PETG).
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Monitored groups */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Monitor</Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="monitor-all"
+                              name="monitorMode"
+                              checked={alertConfig.monitoredGroups === undefined}
+                              onChange={() => setAlertConfig(prev => ({ ...prev, monitoredGroups: undefined }))}
+                              className="h-4 w-4"
+                            />
+                            <Label htmlFor="monitor-all" className="cursor-pointer text-sm">
+                              All groups
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="monitor-selected"
+                              name="monitorMode"
+                              checked={alertConfig.monitoredGroups !== undefined}
+                              onChange={() => setAlertConfig(prev => ({ ...prev, monitoredGroups: [] }))}
+                              className="h-4 w-4"
+                            />
+                            <Label htmlFor="monitor-selected" className="cursor-pointer text-sm">
+                              Selected groups only
+                            </Label>
+                          </div>
+                        </div>
+
+                        {alertConfig.monitoredGroups !== undefined && (
+                          <div className="ml-6 space-y-2 pt-1">
+                            {availableGroups.length === 0 ? (
+                              <p className="text-xs text-muted-foreground italic">No spool groups found.</p>
+                            ) : (
+                              availableGroups.map((group) => (
+                                <div key={group.groupKey} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`group-${group.groupKey}`}
+                                    checked={alertConfig.monitoredGroups?.includes(group.groupKey) ?? false}
+                                    onCheckedChange={(checked) => {
+                                      setAlertConfig(prev => {
+                                        const current = prev.monitoredGroups || [];
+                                        const updated = checked
+                                          ? [...current, group.groupKey]
+                                          : current.filter(k => k !== group.groupKey);
+                                        return { ...prev, monitoredGroups: updated };
+                                      });
+                                    }}
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    {(alertConfig.groupingStrategy === 'material_name' || alertConfig.groupingStrategy === 'material_name_vendor') && group.color_hex && (
+                                      <span
+                                        className="inline-block w-3 h-3 rounded-full border border-border shrink-0"
+                                        style={{ backgroundColor: `#${group.color_hex.replace('#', '')}` }}
+                                      />
+                                    )}
+                                    <Label
+                                      htmlFor={`group-${group.groupKey}`}
+                                      className="cursor-pointer text-sm"
+                                    >
+                                      {group.groupLabel}
+                                    </Label>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({group.spoolCount} spool{group.spoolCount !== 1 ? 's' : ''})
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={saveAlertSettings}
+                        disabled={savingAlerts}
+                      >
+                        {savingAlerts ? 'Saving...' : 'Save Alert Settings'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {!alertConfig.enabled && (
+                    <Button
+                      onClick={saveAlertSettings}
+                      disabled={savingAlerts}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {savingAlerts ? 'Saving...' : 'Save'}
+                    </Button>
                   )}
                 </CardContent>
               </Card>

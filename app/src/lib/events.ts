@@ -40,6 +40,7 @@ export const spoolEvents = new EventEmitter();
 // Event types
 export const SPOOL_UPDATED = 'spool_updated';
 export const ACTIVITY_LOG_CREATED = 'activity_log_created';
+export const ALERT_UPDATED = 'alert_updated';
 
 export interface SpoolUpdateEvent {
   type: 'usage' | 'assign' | 'unassign' | 'tray_change';
