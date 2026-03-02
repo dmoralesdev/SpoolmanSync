@@ -7,8 +7,10 @@
 import {
   matchAmsHumidityEntity,
   matchTrayEntity,
+  matchExternalSpoolEntity,
   buildAmsPattern,
   buildTrayPattern,
+  buildExternalSpoolPattern,
 } from './entity-patterns';
 
 interface TestCase {
@@ -468,6 +470,79 @@ test('GitHub Issue #18: A1 AMS Lite Danish entities still work', () => {
   assertEqual(matchAmsHumidityEntity('sensor.a1_ams_lite_fugtighed'), 'lite');
   assertEqual(matchAmsHumidityEntity('sensor.a1_ams_lite_fugtighedsindeks'), 'lite');
   assertEqual(matchTrayEntity('sensor.a1_ams_lite_bakke_1'), { amsNumber: 'lite', trayNumber: 1 });
+});
+
+// =============================================================================
+// External Spool Entity Tests
+// =============================================================================
+
+interface ExternalSpoolTestCase {
+  name: string;
+  entityId: string;
+  shouldMatch: boolean;
+}
+
+const externalSpoolTestCases: ExternalSpoolTestCase[] = [
+  // English
+  { name: 'English older format', entityId: 'sensor.x1c_00m09d462101575_external_spool', shouldMatch: true },
+  { name: 'English newer format', entityId: 'sensor.x1c_00m09d462101575_externalspool_external_spool', shouldMatch: true },
+  // German
+  { name: 'German older format', entityId: 'sensor.p1s_externe_spule', shouldMatch: true },
+  { name: 'German newer hybrid', entityId: 'sensor.p1s_externalspool_externe_spule', shouldMatch: true },
+  { name: 'German underscore hybrid', entityId: 'sensor.p1s_external_spool_externe_spule', shouldMatch: true },
+  { name: 'German fully localized', entityId: 'sensor.p1s_externespule_externe_spule', shouldMatch: true },
+  // Dutch (GitHub Issue #38)
+  { name: 'Dutch older format', entityId: 'sensor.bambu_lab_p2s_externe_spoel', shouldMatch: true },
+  { name: 'Dutch newer hybrid', entityId: 'sensor.bambu_lab_p2s_externalspool_externe_spoel', shouldMatch: true },
+  { name: 'Dutch underscore hybrid', entityId: 'sensor.bambu_lab_p2s_external_spool_externe_spoel', shouldMatch: true },
+  { name: 'Dutch fully localized', entityId: 'sensor.bambu_lab_p2s_externespoel_externe_spoel', shouldMatch: true },
+  // Italian
+  { name: 'Italian older format', entityId: 'sensor.printer_bobina_esterna', shouldMatch: true },
+  { name: 'Italian newer hybrid', entityId: 'sensor.printer_externalspool_bobina_esterna', shouldMatch: true },
+  { name: 'Italian underscore hybrid', entityId: 'sensor.printer_external_spool_bobina_esterna', shouldMatch: true },
+  // Spanish
+  { name: 'Spanish underscore hybrid', entityId: 'sensor.printer_external_spool_bobina_externa', shouldMatch: true },
+  // French
+  { name: 'French underscore hybrid', entityId: 'sensor.printer_external_spool_bobine_externe', shouldMatch: true },
+  // Czech
+  { name: 'Czech underscore hybrid', entityId: 'sensor.printer_external_spool_externi_civka', shouldMatch: true },
+  // Danish
+  { name: 'Danish underscore hybrid', entityId: 'sensor.printer_external_spool_ekstern_spole', shouldMatch: true },
+  // With version suffix
+  { name: 'English with version suffix', entityId: 'sensor.x1c_external_spool_2', shouldMatch: true },
+  { name: 'Dutch underscore hybrid with suffix', entityId: 'sensor.p2s_external_spool_externe_spoel_2', shouldMatch: true },
+  // Edge cases - should NOT match
+  { name: 'Invalid - binary sensor', entityId: 'binary_sensor.x1c_external_spool_actief', shouldMatch: false },
+  { name: 'Invalid - no external', entityId: 'sensor.x1c_spool', shouldMatch: false },
+];
+
+console.log('\n=== External Spool Entity Tests (matchExternalSpoolEntity) ===\n');
+
+for (const tc of externalSpoolTestCases) {
+  test(tc.name, () => {
+    const result = matchExternalSpoolEntity(tc.entityId);
+    assertEqual(result, tc.shouldMatch);
+  });
+}
+
+console.log('\n=== External Spool Pattern Tests (buildExternalSpoolPattern) ===\n');
+
+test('GitHub Issue #38: Dutch underscore hybrid with prefix', () => {
+  const pattern = buildExternalSpoolPattern('bambu_lab_p2s');
+  const match = 'sensor.bambu_lab_p2s_external_spool_externe_spoel'.match(pattern);
+  if (!match) throw new Error('Pattern should match but didn\'t');
+});
+
+test('buildExternalSpoolPattern: English older format', () => {
+  const pattern = buildExternalSpoolPattern('x1c');
+  const match = 'sensor.x1c_external_spool'.match(pattern);
+  if (!match) throw new Error('Pattern should match but didn\'t');
+});
+
+test('buildExternalSpoolPattern: Wrong prefix does not match', () => {
+  const pattern = buildExternalSpoolPattern('x1c');
+  const match = 'sensor.p1s_external_spool'.match(pattern);
+  if (match) throw new Error('Pattern should NOT match but did');
 });
 
 // =============================================================================

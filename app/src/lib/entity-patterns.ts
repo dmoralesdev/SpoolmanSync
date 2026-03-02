@@ -82,59 +82,74 @@ export const EXTERNAL_SPOOL_NAMES = [
   // German
   'externe_spule',                    // Older format
   'externalspool_externe_spule',      // Newer hybrid (English prefix + German suffix)
+  'external_spool_externe_spule',     // Underscore hybrid (English prefix with underscore + German suffix)
   'externespule_externe_spule',       // Newer fully localized
   // Dutch
   'externe_spoel',                    // Older format
   'externalspool_externe_spoel',      // Newer hybrid
+  'external_spool_externe_spoel',     // Underscore hybrid
   'externespoel_externe_spoel',       // Newer fully localized
   // Spanish
   'bobina_externa',                   // Older format
   'externalspool_bobina_externa',     // Newer hybrid
+  'external_spool_bobina_externa',    // Underscore hybrid
   'bobinaexterna_bobina_externa',     // Newer fully localized
   // Italian
   'bobina_esterna',                   // Older format
   'externalspool_bobina_esterna',     // Newer hybrid
+  'external_spool_bobina_esterna',    // Underscore hybrid
   'bobinaesterna_bobina_esterna',     // Newer fully localized
   // French
   'bobine_externe',                   // Older format
   'externalspool_bobine_externe',     // Newer hybrid
+  'external_spool_bobine_externe',    // Underscore hybrid
   'bobineexterne_bobine_externe',     // Newer fully localized
   // Catalan
   'bobina_externa',                   // Same as Spanish
   'externalspool_bobina_externa',     // Newer hybrid
+  'external_spool_bobina_externa',    // Underscore hybrid
   // Czech
   'externi_civka',                    // Older format (Externí cívka)
   'externalspool_externi_civka',      // Newer hybrid
+  'external_spool_externi_civka',     // Underscore hybrid
   'externicivka_externi_civka',       // Newer fully localized
   // Danish
   'ekstern_spole',                    // Older format (Ekstern spole)
   'externalspool_ekstern_spole',      // Newer hybrid
+  'external_spool_ekstern_spole',     // Underscore hybrid
   'eksternspole_ekstern_spole',       // Newer fully localized
   // Greek
   'exoteriko_nima',                   // Older format (Εξωτερικό νήμα)
   'externalspool_exoteriko_nima',     // Newer hybrid
+  'external_spool_exoteriko_nima',    // Underscore hybrid
   'exoteriko_nima_exoteriko_nima',    // Newer fully localized
   // Korean
   'oebu_seupul',                      // Older format (외부 스풀)
   'externalspool_oebu_seupul',        // Newer hybrid
+  'external_spool_oebu_seupul',       // Underscore hybrid
   // Polish
   'zewnetrzna_szpula',                // Older format (Zewnętrzna szpula)
   'externalspool_zewnetrzna_szpula',  // Newer hybrid
+  'external_spool_zewnetrzna_szpula', // Underscore hybrid
   'zewnetrznaszpula_zewnetrzna_szpula', // Newer fully localized
   // Portuguese / Portuguese Brazil
   'carretel_externo',                 // Older format (Carretel externo)
   'externalspool_carretel_externo',   // Newer hybrid
+  'external_spool_carretel_externo',  // Underscore hybrid
   'carretelexterno_carretel_externo', // Newer fully localized
   // Slovak
   'vonkajsia_cievka',                 // Older format (Vonkajšia cievka)
   'externalspool_vonkajsia_cievka',   // Newer hybrid
+  'external_spool_vonkajsia_cievka',  // Underscore hybrid
   'vonkajsiacievka_vonkajsia_cievka', // Newer fully localized
   // Thai
   'sapun_phainok',                    // Older format (สปูลภายนอก)
   'externalspool_sapun_phainok',      // Newer hybrid
+  'external_spool_sapun_phainok',     // Underscore hybrid
   // Chinese
   'waigua_liaopan',                   // Older format (外挂料盘)
   'externalspool_waigua_liaopan',     // Newer hybrid
+  'external_spool_waigua_liaopan',    // Underscore hybrid
   'waigualiaopan_waigua_liaopan',     // Newer fully localized
 ];
 
