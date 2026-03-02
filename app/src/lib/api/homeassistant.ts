@@ -696,12 +696,18 @@ export class HomeAssistantClient {
     // See src/lib/entity-patterns.ts to add support for more languages
     const printerStates = states.filter(s => isPrintStatusEntity(s.entity_id));
 
+    // Deduplicate by prefix — ha-bambulab may create versioned entities
+    // (e.g., print_status and print_status_2) for the same printer
+    const discoveredPrefixes = new Set<string>();
+
     for (const printerState of printerStates) {
       // Extract printer prefix using centralized patterns
       const match = printerState.entity_id.match(buildPrintStatusPattern());
       if (!match) continue;
 
       const prefix = match[1];
+      if (discoveredPrefixes.has(prefix)) continue;
+      discoveredPrefixes.add(prefix);
       const printer: HAPrinter = {
         entity_id: printerState.entity_id,
         name: cleanFriendlyName(printerState.attributes.friendly_name as string, prefix),
