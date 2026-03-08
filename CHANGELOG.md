@@ -5,6 +5,16 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-03-08
+
+### Added
+- **Multi-external spool support** - Printers with multiple external spools (e.g., Bambu H2C) are now fully supported across discovery, dashboard, spool assignment, and automation config generation (#35)
+
+### Fixed
+- Active tray detection for external spools now uses the `active` attribute directly from ha-bambulab instead of inferring activity from AMS tray state, enabling accurate detection on multi-nozzle printers (#35)
+- AMS HT entity detection improved with proper composite ID encoding and display name handling (#35)
+- Usage report chart no longer shows gaps when days have zero usage; x-axis is now continuous
+
 ## [1.3.1] - 2026-03-01
 
 ### Added
