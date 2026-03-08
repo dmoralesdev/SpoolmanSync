@@ -26,13 +26,14 @@ interface PrinterWithSpools extends HAPrinter {
       [key: string]: unknown;
     }>;
   }>;
-  external_spool?: {
+  external_spools: Array<{
     entity_id: string;
     tray_number: number;
+    is_external?: boolean;
     name?: string;
     assigned_spool?: Spool;
     [key: string]: unknown;
-  };
+  }>;
 }
 
 interface Settings {

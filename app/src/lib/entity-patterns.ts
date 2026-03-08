@@ -403,11 +403,13 @@ export function buildAmsPattern(prefix: string): RegExp {
   // AMS type suffix (pro, ht) is optional and can appear before or after the number:
   //   - Number-first: "ams_2_pro_" (e.g., sensor.xxx_ams_2_pro_humidity)
   //   - Type-first: "ams_pro_2_" (e.g., sensor.xxx_ams_pro_2_humidity)
+  //   - HT type-first: "ams_ht_1_" (e.g., sensor.xxx_ams_ht_1_umidita) — matched separately
   // Group 1: AMS number from number-first format (ams_NUMBER_pro_)
-  // Group 2: AMS number from type-first format (ams_pro_NUMBER_)
+  // Group 2: AMS number from type-first format (ams_pro_NUMBER_) — NOT ht, handled by group 4
   // Group 3: "lite" or "ht" when using standalone naming
-  // Group 4: entity version suffix (optional)
-  return new RegExp(`^sensor\\.${prefix}_ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro|ht)_(\\d+)_|(lite|ht)_)?(?:${names})(?:_(\\d+))?$`);
+  // Group 4: AMS HT number from type-first format (ams_ht_NUMBER_)
+  // Group 5: entity version suffix (optional)
+  return new RegExp(`^sensor\\.${prefix}_ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite|ht)_|ht_(\\d+)_)?(?:${names})(?:_(\\d+))?$`);
 }
 
 /**
@@ -425,22 +427,45 @@ export function buildAmsPattern(prefix: string): RegExp {
  */
 export function buildTrayPattern(prefix: string, amsNumber: string, trayNum: number): RegExp {
   const names = TRAY_NAMES.join('|');
+  const numAms = parseInt(amsNumber, 10);
+
+  // AMS HT (amsNumber >= 128): match multiple naming patterns
+  // e.g., ams_128_tray_1, ams_128_ht_tray_1, ams_ht_1_tray_1, ams_ht_tray_1 (when 128)
+  if (numAms >= 128) {
+    const htNum = numAms - 127; // 128→1, 129→2, etc.
+    // Match: ams_128_tray_N, ams_128_ht_tray_N, ams_ht_1_tray_N, ams_ht_tray_N (standalone)
+    return new RegExp(`^sensor\\.${prefix}_ams_(?:${amsNumber}(?:_ht)?_|ht_${htNum}_|ht_)(?:${names})_${trayNum}(?:_(\\d+))?$`);
+  }
+
   // For A1 with AMS Lite (amsNumber="1"), also match entities without explicit AMS number
   // e.g., "sensor.schiller_ams_tray_1" in addition to "sensor.schiller_ams_1_tray_1"
-  // AMS type suffix (pro, ht) can appear before or after the number:
-  //   - Number-first: "ams_1_pro_" / Type-first: "ams_pro_1_"
+  // Note: "ht" is NOT included in type alternatives — AMS HT is handled above
   if (amsNumber === '1') {
-    return new RegExp(`^sensor\\.${prefix}_ams_(?:1(?:_(?:pro|ht))?_|(?:pro|ht)_1_)?(?:${names})_${trayNum}(?:_(\\d+))?$`);
+    return new RegExp(`^sensor\\.${prefix}_ams_(?:1(?:_(?:pro))?_|(?:pro)_1_)?(?:${names})_${trayNum}(?:_(\\d+))?$`);
   }
-  return new RegExp(`^sensor\\.${prefix}_ams_(?:${amsNumber}(?:_(?:pro|ht))?|(?:pro|ht)_${amsNumber})_(?:${names})_${trayNum}(?:_(\\d+))?$`);
+  return new RegExp(`^sensor\\.${prefix}_ams_(?:${amsNumber}(?:_(?:pro))?|(?:pro)_${amsNumber})_(?:${names})_${trayNum}(?:_(\\d+))?$`);
 }
 
 /**
  * Build a regex pattern for external spool sensors
  * @param prefix - The printer prefix
+ *
+ * H2C printers have multiple external spools with numbered prefixes:
+ * - externalspool_bobina_esterna (first)
+ * - externalspool2_bobina_esterna (second)
+ * We handle this by transforming "externalspool_" → "externalspool\d*_" in the regex.
  */
 export function buildExternalSpoolPattern(prefix: string): RegExp {
-  const names = EXTERNAL_SPOOL_NAMES.join('|');
+  // Transform names to handle numbered external spool prefixes
+  const namePatterns = EXTERNAL_SPOOL_NAMES.map(name => {
+    // Add optional digit(s) after common prefix patterns
+    return name
+      .replace(/^externalspool_/, 'externalspool\\d*_')
+      .replace(/^external_spool_/, 'external_spool_?\\d*_?');
+  });
+  // Deduplicate patterns that became identical after transformation
+  const uniquePatterns = [...new Set(namePatterns)];
+  const names = uniquePatterns.join('|');
   return new RegExp(`^sensor\\.${prefix}_(${names})(?:_(\\d+))?$`);
 }
 
@@ -563,29 +588,43 @@ export function getLocalizedEntityName(
  * e.g., "sensor.bambu_lab_ams_2_pro_humidity" -> "2" (P2S AMS Pro, number-first)
  * e.g., "sensor.p1s_ams_pro_2_humidity" -> "2" (AMS Pro, type-first)
  * e.g., "sensor.a1_mini_ams_128_humidity" -> "128" (AMS HT)
- * e.g., "sensor.a1_mini_ams_ht_humidity" -> "ht" (AMS HT alternate naming)
+ * e.g., "sensor.a1_mini_ams_ht_humidity" -> "128" (AMS HT alternate naming)
+ * e.g., "sensor.h2c_ams_ht_1_humidity" -> "128" (AMS HT type-first)
  */
 export function matchAmsHumidityEntity(entityId: string): string | null {
   const names = AMS_HUMIDITY_NAMES.join('|');
 
-  // Check for standalone "ht" naming first (ams_ht_humidity, without a number)
+  // Check for type-first "ams_ht_N_humidity" pattern (e.g., ams_ht_1_umidita)
+  // This MUST be checked before the generic pattern to avoid collision with regular AMS numbers
+  const htNumberedPattern = new RegExp(`^sensor\\.(?:.+_)?ams_ht_(\\d+)_(?:${names})(?:_\\d+)?$`);
+  const htNumberedMatch = entityId.match(htNumberedPattern);
+  if (htNumberedMatch) {
+    return String(127 + parseInt(htNumberedMatch[1], 10));
+  }
+
+  // Check for standalone "ht" naming (ams_ht_humidity, without a number)
   // Prefix is optional to support renamed entities (e.g., sensor.ams_ht_humidity)
   const htPattern = new RegExp(`^sensor\\.(?:.+_)?ams_(ht)_(?:${names})(?:_\\d+)?$`);
   const htMatch = entityId.match(htPattern);
   if (htMatch) {
-    return 'ht';
+    return '128';
   }
 
   // AMS number is optional - A1 with AMS Lite uses just "_ams_" without a number
-  // AMS type suffix (pro, ht) can appear before or after the number:
+  // AMS type suffix (pro) can appear before or after the number:
   //   - Number-first: "ams_2_pro_" / Type-first: "ams_pro_2_"
+  // Note: "ht" is NOT included here — it's handled above to prevent collision
   // Prefix is optional to support renamed entities (e.g., sensor.ams_humidity, sensor.ams_1_humidity)
   // Group 1: AMS number from number-first format (ams_NUMBER_pro_)
   // Group 2: AMS number from type-first format (ams_pro_NUMBER_)
   // Group 3: "lite" when AMS Lite with explicit naming
-  const pattern = new RegExp(`^sensor\\.(?:.+_)?ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro|ht)_(\\d+)_|(lite)_)?(?:${names})(?:_\\d+)?$`);
+  const pattern = new RegExp(`^sensor\\.(?:.+_)?ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite)_)?(?:${names})(?:_\\d+)?$`);
   const match = entityId.match(pattern);
   if (match) {
+    // If number-first format matched with ht suffix, apply offset
+    if (match[1] && entityId.includes('_ams_' + match[1] + '_ht_')) {
+      return String(127 + parseInt(match[1], 10));
+    }
     // Return AMS number, or "lite", or default to "1" for A1 AMS Lite without explicit naming
     return match[1] || match[2] || match[3] || '1';
   }
@@ -600,33 +639,53 @@ export function matchAmsHumidityEntity(entityId: string): string | null {
  * e.g., "sensor.bambu_lab_ams_2_pro_slot_1" -> { amsNumber: "2", trayNumber: 1 } (P2S AMS Pro, number-first)
  * e.g., "sensor.p1s_ams_pro_2_bakke_1" -> { amsNumber: "2", trayNumber: 1 } (AMS Pro, type-first)
  * e.g., "sensor.a1_mini_ams_128_tray_1" -> { amsNumber: "128", trayNumber: 1 } (AMS HT)
- * e.g., "sensor.a1_mini_ams_ht_tray_1" -> { amsNumber: "ht", trayNumber: 1 } (AMS HT alternate naming)
+ * e.g., "sensor.a1_mini_ams_ht_tray_1" -> { amsNumber: "128", trayNumber: 1 } (AMS HT alternate naming)
+ * e.g., "sensor.h2c_ams_ht_1_tray_1" -> { amsNumber: "128", trayNumber: 1 } (AMS HT type-first)
  */
 export function matchTrayEntity(entityId: string): { amsNumber: string; trayNumber: number } | null {
   const names = TRAY_NAMES.join('|');
 
-  // Check for standalone "ht" naming first (ams_ht_tray_N, without a number)
+  // Check for type-first "ams_ht_N_tray_M" pattern (e.g., ams_ht_1_slot_1)
+  // This MUST be checked before the generic pattern to avoid collision with regular AMS numbers
+  const htNumberedPattern = new RegExp(`^sensor\\.(?:.+_)?ams_ht_(\\d+)_(?:${names})_(\\d+)(?:_\\d+)?$`);
+  const htNumberedMatch = entityId.match(htNumberedPattern);
+  if (htNumberedMatch) {
+    return {
+      amsNumber: String(127 + parseInt(htNumberedMatch[1], 10)),
+      trayNumber: parseInt(htNumberedMatch[2], 10),
+    };
+  }
+
+  // Check for standalone "ht" naming (ams_ht_tray_N, without a number)
   // Prefix is optional to support renamed entities (e.g., sensor.ams_ht_tray_1)
   const htPattern = new RegExp(`^sensor\\.(?:.+_)?ams_(ht)_(?:${names})_(\\d+)(?:_\\d+)?$`);
   const htMatch = entityId.match(htPattern);
   if (htMatch) {
     return {
-      amsNumber: 'ht',
+      amsNumber: '128',
       trayNumber: parseInt(htMatch[2], 10),
     };
   }
 
   // AMS number is optional - A1 with AMS Lite uses just "_ams_tray_N" without a number
-  // AMS type suffix (pro, ht) can appear before or after the number:
+  // AMS type suffix (pro) can appear before or after the number:
   //   - Number-first: "ams_2_pro_" / Type-first: "ams_pro_2_"
+  // Note: "ht" is NOT included in type-first branch — it's handled above to prevent collision
   // Prefix is optional to support renamed entities (e.g., sensor.ams_tray_1, sensor.ams_1_tray_1)
   // Group 1: AMS number from number-first format (ams_NUMBER_pro_)
   // Group 2: AMS number from type-first format (ams_pro_NUMBER_)
   // Group 3: "lite" when AMS Lite with explicit naming
   // Group 4: tray number
-  const pattern = new RegExp(`^sensor\\.(?:.+_)?ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro|ht)_(\\d+)_|(lite)_)?(?:${names})_(\\d+)(?:_\\d+)?$`);
+  const pattern = new RegExp(`^sensor\\.(?:.+_)?ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite)_)?(?:${names})_(\\d+)(?:_\\d+)?$`);
   const match = entityId.match(pattern);
   if (match) {
+    // If number-first format matched with ht suffix, apply offset
+    if (match[1] && entityId.includes('_ams_' + match[1] + '_ht_')) {
+      return {
+        amsNumber: String(127 + parseInt(match[1], 10)),
+        trayNumber: parseInt(match[4], 10),
+      };
+    }
     return {
       // Return AMS number, or "lite", or default to "1" for A1 AMS Lite without explicit naming
       amsNumber: match[1] || match[2] || match[3] || '1',
@@ -638,11 +697,40 @@ export function matchTrayEntity(entityId: string): { amsNumber: string; trayNumb
 
 /**
  * Check if an entity ID is an external spool sensor (any prefix)
+ * Handles numbered external spools (e.g., externalspool2_bobina_esterna)
  */
 export function matchExternalSpoolEntity(entityId: string): boolean {
-  const names = EXTERNAL_SPOOL_NAMES.join('|');
+  const namePatterns = EXTERNAL_SPOOL_NAMES.map(name => {
+    return name
+      .replace(/^externalspool_/, 'externalspool\\d*_')
+      .replace(/^external_spool_/, 'external_spool_?\\d*_?');
+  });
+  const uniquePatterns = [...new Set(namePatterns)];
+  const names = uniquePatterns.join('|');
   const pattern = new RegExp(`^sensor\\..+_(${names})(?:_\\d+)?$`);
   return pattern.test(entityId);
+}
+
+/**
+ * Extract the external spool index from an entity ID
+ * e.g., "sensor.xxx_externalspool_bobina_esterna" → 1
+ * e.g., "sensor.xxx_externalspool2_bobina_esterna" → 2
+ * e.g., "sensor.xxx_bobina_esterna" → 1 (older format, no number)
+ * Returns 1 for any format without an explicit number
+ */
+export function getExternalSpoolIndex(entityId: string): number {
+  // Check for numbered prefix pattern: externalspool2_, externalspool3_, etc.
+  const numberedMatch = entityId.match(/_externalspool(\d+)_/);
+  if (numberedMatch) {
+    return parseInt(numberedMatch[1], 10);
+  }
+  // Check for numbered underscore pattern: external_spool_2_, etc.
+  const underscoredMatch = entityId.match(/_external_spool_(\d+)_/);
+  if (underscoredMatch) {
+    return parseInt(underscoredMatch[1], 10);
+  }
+  // No number → first (default) external spool
+  return 1;
 }
 
 /**

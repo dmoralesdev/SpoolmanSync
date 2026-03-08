@@ -200,8 +200,8 @@ export async function POST(request: NextRequest) {
               printerTrayIds.push(tray.entity_id);
             }
           }
-          if (printer.external_spool) {
-            printerTrayIds.push(printer.external_spool.entity_id);
+          for (const extSpool of printer.external_spools) {
+            printerTrayIds.push(extSpool.entity_id);
           }
 
           const automationId = `spoolmansync_update_spool_${prefix}`;
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
 
         const allTrayIds = printers.flatMap(p => [
           ...p.ams_units.flatMap(ams => ams.trays.map(t => t.entity_id)),
-          ...(p.external_spool ? [p.external_spool.entity_id] : []),
+          ...p.external_spools.map(es => es.entity_id),
         ]);
 
         await createActivityLog({

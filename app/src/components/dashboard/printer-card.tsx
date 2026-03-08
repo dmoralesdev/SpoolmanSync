@@ -34,7 +34,7 @@ interface PrinterWithSpools {
   name: string;
   state: string;
   ams_units: AMSWithSpools[];
-  external_spool?: TrayWithSpool;
+  external_spools: TrayWithSpool[];
 }
 
 interface PrinterCardProps {
@@ -75,29 +75,28 @@ export function PrinterCard({ printer, spools, onSpoolAssign, onSpoolUnassign }:
           </div>
         ))}
 
-        {/* External spool slot - only show if discovered in HA */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-muted-foreground">
-            External Spool
-          </h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {printer.external_spool ? (
-              <TraySlot
-                tray={printer.external_spool}
-                assignedSpool={printer.external_spool.assigned_spool}
-                spools={spools}
-                onAssign={(spoolId) => {
-                  onSpoolAssign(printer.external_spool!.entity_id, spoolId);
-                }}
-                onUnassign={onSpoolUnassign}
-              />
-            ) : (
-              <div className="p-3 rounded-lg border border-dashed border-muted-foreground/30 text-center text-sm text-muted-foreground">
-                Not detected in Home Assistant
-              </div>
-            )}
+        {/* External spool slots - only show if discovered in HA */}
+        {printer.external_spools.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              {printer.external_spools.length > 1 ? 'External Spools' : 'External Spool'}
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {printer.external_spools.map((extSpool) => (
+                <TraySlot
+                  key={extSpool.entity_id}
+                  tray={extSpool}
+                  assignedSpool={extSpool.assigned_spool}
+                  spools={spools}
+                  onAssign={(spoolId) => {
+                    onSpoolAssign(extSpool.entity_id, spoolId);
+                  }}
+                  onUnassign={onSpoolUnassign}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

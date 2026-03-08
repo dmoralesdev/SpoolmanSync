@@ -102,10 +102,11 @@ export default function SpoolAssignPage({
               });
             }
           }
-          if (printer.external_spool) {
+          const extSpools = printer.external_spools || [];
+          for (let i = 0; i < extSpools.length; i++) {
             trayOptions.push({
-              id: printer.external_spool.entity_id,
-              label: 'External Spool',
+              id: extSpools[i].entity_id,
+              label: extSpools.length > 1 ? `External Spool ${i + 1}` : 'External Spool',
               printer: printer.name,
             });
           }

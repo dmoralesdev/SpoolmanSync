@@ -8,6 +8,7 @@ import {
   matchAmsHumidityEntity,
   matchTrayEntity,
   matchExternalSpoolEntity,
+  getExternalSpoolIndex,
   buildAmsPattern,
   buildTrayPattern,
   buildExternalSpoolPattern,
@@ -58,11 +59,17 @@ const humidityTestCases: TestCase[] = [
   { name: 'AMS Pro type-first German', entityId: 'sensor.bambu_lab_ams_pro_1_luftfeuchtigkeit', expected: '1' },
   { name: 'No prefix - ams_pro_2_humidity', entityId: 'sensor.ams_pro_2_humidity', expected: '2' },
 
-  // AMS HT - uses index 128 or standalone "ht"
+  // AMS HT - all naming variants normalize to 128+
   { name: 'AMS HT with 128', entityId: 'sensor.a1_mini_ams_128_humidity', expected: '128' },
-  { name: 'AMS HT standalone', entityId: 'sensor.a1_mini_ams_ht_humidity', expected: 'ht' },
+  { name: 'AMS HT standalone', entityId: 'sensor.a1_mini_ams_ht_humidity', expected: '128' },
   { name: 'AMS HT 128 German', entityId: 'sensor.printer_ams_128_luftfeuchtigkeit', expected: '128' },
-  { name: 'AMS HT standalone German', entityId: 'sensor.printer_ams_ht_luftfeuchtigkeit', expected: 'ht' },
+  { name: 'AMS HT standalone German', entityId: 'sensor.printer_ams_ht_luftfeuchtigkeit', expected: '128' },
+  // AMS HT type-first (H2C with ams_ht_1_humidity pattern)
+  { name: 'AMS HT type-first Italian', entityId: 'sensor.h2c_ams_ht_1_umidita', expected: '128' },
+  { name: 'AMS HT type-first English', entityId: 'sensor.h2c_ams_ht_1_humidity', expected: '128' },
+  { name: 'AMS HT type-first #2', entityId: 'sensor.h2c_ams_ht_2_humidity', expected: '129' },
+  // AMS number-first with ht suffix (ams_1_ht_humidity)
+  { name: 'AMS HT number-first suffix', entityId: 'sensor.h2c_ams_1_ht_humidity', expected: '128' },
 
   // Renamed entities with no printer prefix (GitHub Issue #9 comment)
   { name: 'No prefix - ams_humidity', entityId: 'sensor.ams_humidity', expected: '1' },
@@ -71,7 +78,7 @@ const humidityTestCases: TestCase[] = [
   { name: 'No prefix - ams_lite_humidity', entityId: 'sensor.ams_lite_humidity', expected: 'lite' },
   { name: 'No prefix - ams_2_pro_humidity', entityId: 'sensor.ams_2_pro_humidity', expected: '2' },
   { name: 'No prefix - ams_128_humidity', entityId: 'sensor.ams_128_humidity', expected: '128' },
-  { name: 'No prefix - ams_ht_humidity', entityId: 'sensor.ams_ht_humidity', expected: 'ht' },
+  { name: 'No prefix - ams_ht_humidity', entityId: 'sensor.ams_ht_humidity', expected: '128' },
   { name: 'No prefix - ams_luftfeuchtigkeit', entityId: 'sensor.ams_luftfeuchtigkeit', expected: '1' },
 
   // Edge cases - should NOT match
@@ -109,11 +116,17 @@ const trayTestCases: TrayTestCase[] = [
   { name: 'AMS Pro type-first German', entityId: 'sensor.bambu_lab_ams_pro_1_slot_3', expected: { amsNumber: '1', trayNumber: 3 } },
   { name: 'No prefix - ams_pro_2_tray_1', entityId: 'sensor.ams_pro_2_tray_1', expected: { amsNumber: '2', trayNumber: 1 } },
 
-  // AMS HT - uses index 128 or standalone "ht"
+  // AMS HT - all naming variants normalize to 128+
   { name: 'AMS HT with 128 Tray 1', entityId: 'sensor.a1_mini_ams_128_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
-  { name: 'AMS HT standalone Tray 2', entityId: 'sensor.a1_mini_ams_ht_tray_2', expected: { amsNumber: 'ht', trayNumber: 2 } },
+  { name: 'AMS HT standalone Tray 2', entityId: 'sensor.a1_mini_ams_ht_tray_2', expected: { amsNumber: '128', trayNumber: 2 } },
   { name: 'AMS HT 128 Slot German', entityId: 'sensor.printer_ams_128_slot_1', expected: { amsNumber: '128', trayNumber: 1 } },
-  { name: 'AMS HT standalone Slot', entityId: 'sensor.printer_ams_ht_slot_4', expected: { amsNumber: 'ht', trayNumber: 4 } },
+  { name: 'AMS HT standalone Slot', entityId: 'sensor.printer_ams_ht_slot_4', expected: { amsNumber: '128', trayNumber: 4 } },
+  // AMS HT type-first (H2C with ams_ht_1_tray_N pattern)
+  { name: 'AMS HT type-first Tray 1', entityId: 'sensor.h2c_ams_ht_1_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
+  { name: 'AMS HT type-first Slot Italian', entityId: 'sensor.h2c_ams_ht_1_slot_2', expected: { amsNumber: '128', trayNumber: 2 } },
+  { name: 'AMS HT type-first #2 Tray 1', entityId: 'sensor.h2c_ams_ht_2_tray_1', expected: { amsNumber: '129', trayNumber: 1 } },
+  // AMS number-first with ht suffix (ams_1_ht_tray_N)
+  { name: 'AMS HT number-first suffix Tray 1', entityId: 'sensor.h2c_ams_1_ht_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
 
   // Renamed entities with no printer prefix (GitHub Issue #9 comment)
   { name: 'No prefix - ams_tray_1', entityId: 'sensor.ams_tray_1', expected: { amsNumber: '1', trayNumber: 1 } },
@@ -122,7 +135,7 @@ const trayTestCases: TrayTestCase[] = [
   { name: 'No prefix - ams_2_tray_3', entityId: 'sensor.ams_2_tray_3', expected: { amsNumber: '2', trayNumber: 3 } },
   { name: 'No prefix - ams_2_pro_tray_1', entityId: 'sensor.ams_2_pro_tray_1', expected: { amsNumber: '2', trayNumber: 1 } },
   { name: 'No prefix - ams_128_tray_1', entityId: 'sensor.ams_128_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
-  { name: 'No prefix - ams_ht_tray_2', entityId: 'sensor.ams_ht_tray_2', expected: { amsNumber: 'ht', trayNumber: 2 } },
+  { name: 'No prefix - ams_ht_tray_2', entityId: 'sensor.ams_ht_tray_2', expected: { amsNumber: '128', trayNumber: 2 } },
   { name: 'No prefix - ams_slot_1 German', entityId: 'sensor.ams_slot_1', expected: { amsNumber: '1', trayNumber: 1 } },
 
   // Edge cases - should NOT match
@@ -147,6 +160,9 @@ const buildAmsPatternTestCases: BuildPatternTestCase[] = [
   { name: 'AMS Pro number-first match', prefix: 'bambu_lab', entityId: 'sensor.bambu_lab_ams_2_pro_humidity', shouldMatch: true, expectedAmsNumber: '2' },
   { name: 'AMS Pro type-first match', prefix: 'p1s', entityId: 'sensor.p1s_ams_pro_2_fugtighed', shouldMatch: true, expectedAmsNumber: '2' },
   { name: 'AMS HT 128 match', prefix: 'a1_mini', entityId: 'sensor.a1_mini_ams_128_humidity', shouldMatch: true, expectedAmsNumber: '128' },
+  { name: 'AMS HT standalone match', prefix: 'a1_mini', entityId: 'sensor.a1_mini_ams_ht_humidity', shouldMatch: true, expectedAmsNumber: '128' },
+  { name: 'AMS HT type-first match', prefix: 'h2c', entityId: 'sensor.h2c_ams_ht_1_humidity', shouldMatch: true, expectedAmsNumber: '128' },
+  { name: 'AMS HT type-first #2', prefix: 'h2c', entityId: 'sensor.h2c_ams_ht_2_humidity', shouldMatch: true, expectedAmsNumber: '129' },
   { name: 'AMS Lite match', prefix: 'a1_mini', entityId: 'sensor.a1_mini_ams_lite_humidity', shouldMatch: true, expectedAmsNumber: 'lite' },
   { name: 'Wrong prefix no match', prefix: 'x1c', entityId: 'sensor.p1s_ams_1_humidity', shouldMatch: false },
 ];
@@ -169,7 +185,14 @@ const buildTrayPatternTestCases: BuildTrayPatternTestCase[] = [
   { name: 'AMS Pro number-first tray match', prefix: 'bambu_lab', amsNumber: '2', trayNum: 1, entityId: 'sensor.bambu_lab_ams_2_pro_tray_1', shouldMatch: true },
   { name: 'AMS Pro type-first tray match', prefix: 'p1s', amsNumber: '2', trayNum: 1, entityId: 'sensor.p1s_ams_pro_2_bakke_1', shouldMatch: true },
   { name: 'AMS Pro type-first tray 4', prefix: 'p1s', amsNumber: '2', trayNum: 4, entityId: 'sensor.p1s_ams_pro_2_bakke_4', shouldMatch: true },
-  { name: 'AMS HT tray match', prefix: 'a1_mini', amsNumber: '128', trayNum: 1, entityId: 'sensor.a1_mini_ams_128_tray_1', shouldMatch: true },
+  // AMS HT (amsNumber=128) should match multiple naming patterns
+  { name: 'AMS HT tray match (ams_128)', prefix: 'a1_mini', amsNumber: '128', trayNum: 1, entityId: 'sensor.a1_mini_ams_128_tray_1', shouldMatch: true },
+  { name: 'AMS HT tray match (ams_128_ht)', prefix: 'a1_mini', amsNumber: '128', trayNum: 1, entityId: 'sensor.a1_mini_ams_128_ht_tray_1', shouldMatch: true },
+  { name: 'AMS HT tray match (ams_ht_1)', prefix: 'h2c', amsNumber: '128', trayNum: 1, entityId: 'sensor.h2c_ams_ht_1_tray_1', shouldMatch: true },
+  { name: 'AMS HT tray match (ams_ht standalone)', prefix: 'a1_mini', amsNumber: '128', trayNum: 1, entityId: 'sensor.a1_mini_ams_ht_tray_1', shouldMatch: true },
+  { name: 'AMS HT slot match (ams_ht_1)', prefix: 'h2c', amsNumber: '128', trayNum: 2, entityId: 'sensor.h2c_ams_ht_1_slot_2', shouldMatch: true },
+  // AMS HT should NOT match amsNumber=1
+  { name: 'AMS HT should not match amsNumber=1', prefix: 'h2c', amsNumber: '1', trayNum: 1, entityId: 'sensor.h2c_ams_ht_1_tray_1', shouldMatch: false },
   { name: 'AMS Lite no number match', prefix: 'schiller', amsNumber: '1', trayNum: 1, entityId: 'sensor.schiller_ams_tray_1', shouldMatch: true },
   { name: 'Wrong tray no match', prefix: 'x1c', amsNumber: '1', trayNum: 1, entityId: 'sensor.x1c_ams_1_tray_2', shouldMatch: false },
 ];
@@ -310,8 +333,18 @@ for (const tc of buildAmsPatternTestCases) {
     if (tc.shouldMatch) {
       if (!match) throw new Error(`Pattern should match but didn't`);
       if (tc.expectedAmsNumber) {
-        // Group 1 = number (number-first), Group 2 = number (type-first), Group 3 = "lite" or "ht"
-        const amsNum = match[1] || match[2] || match[3] || '1';
+        // Group 1 = number (number-first), Group 2 = number (type-first pro)
+        // Group 3 = "lite" or "ht" (standalone), Group 4 = number (type-first ht)
+        let amsNum: string;
+        if (match[4]) {
+          // HT type-first: offset by 127
+          amsNum = String(127 + parseInt(match[4], 10));
+        } else if (match[3] === 'ht') {
+          // Standalone "ht": maps to 128
+          amsNum = '128';
+        } else {
+          amsNum = match[1] || match[2] || match[3] || '1';
+        }
         assertEqual(amsNum, tc.expectedAmsNumber);
       }
     } else {
@@ -511,6 +544,13 @@ const externalSpoolTestCases: ExternalSpoolTestCase[] = [
   // With version suffix
   { name: 'English with version suffix', entityId: 'sensor.x1c_external_spool_2', shouldMatch: true },
   { name: 'Dutch underscore hybrid with suffix', entityId: 'sensor.p2s_external_spool_externe_spoel_2', shouldMatch: true },
+  // H2C numbered external spools (GitHub Issue #35)
+  { name: 'H2C Italian numbered spool 1', entityId: 'sensor.h2c_externalspool_bobina_esterna', shouldMatch: true },
+  { name: 'H2C Italian numbered spool 2', entityId: 'sensor.h2c_externalspool2_bobina_esterna', shouldMatch: true },
+  { name: 'H2C Italian numbered spool 3', entityId: 'sensor.h2c_externalspool3_bobina_esterna', shouldMatch: true },
+  { name: 'H2C English numbered spool 2', entityId: 'sensor.h2c_externalspool2_external_spool', shouldMatch: true },
+  { name: 'H2C German numbered spool 2', entityId: 'sensor.h2c_externalspool2_externe_spule', shouldMatch: true },
+  { name: 'H2C underscore numbered spool 2', entityId: 'sensor.h2c_external_spool_2_bobina_esterna', shouldMatch: true },
   // Edge cases - should NOT match
   { name: 'Invalid - binary sensor', entityId: 'binary_sensor.x1c_external_spool_actief', shouldMatch: false },
   { name: 'Invalid - no external', entityId: 'sensor.x1c_spool', shouldMatch: false },
@@ -543,6 +583,88 @@ test('buildExternalSpoolPattern: Wrong prefix does not match', () => {
   const pattern = buildExternalSpoolPattern('x1c');
   const match = 'sensor.p1s_external_spool'.match(pattern);
   if (match) throw new Error('Pattern should NOT match but did');
+});
+
+test('buildExternalSpoolPattern: H2C numbered spool 1 (no digit)', () => {
+  const pattern = buildExternalSpoolPattern('h2c');
+  const match = 'sensor.h2c_externalspool_bobina_esterna'.match(pattern);
+  if (!match) throw new Error('Pattern should match but didn\'t');
+});
+
+test('buildExternalSpoolPattern: H2C numbered spool 2', () => {
+  const pattern = buildExternalSpoolPattern('h2c');
+  const match = 'sensor.h2c_externalspool2_bobina_esterna'.match(pattern);
+  if (!match) throw new Error('Pattern should match but didn\'t');
+});
+
+test('buildExternalSpoolPattern: underscore numbered spool 2', () => {
+  const pattern = buildExternalSpoolPattern('h2c');
+  const match = 'sensor.h2c_external_spool_2_bobina_esterna'.match(pattern);
+  if (!match) throw new Error('Pattern should match but didn\'t');
+});
+
+// =============================================================================
+// getExternalSpoolIndex Tests
+// =============================================================================
+
+console.log('\n=== getExternalSpoolIndex Tests ===\n');
+
+test('getExternalSpoolIndex: unnumbered externalspool returns 1', () => {
+  assertEqual(getExternalSpoolIndex('sensor.h2c_externalspool_bobina_esterna'), 1);
+});
+
+test('getExternalSpoolIndex: externalspool2 returns 2', () => {
+  assertEqual(getExternalSpoolIndex('sensor.h2c_externalspool2_bobina_esterna'), 2);
+});
+
+test('getExternalSpoolIndex: externalspool3 returns 3', () => {
+  assertEqual(getExternalSpoolIndex('sensor.h2c_externalspool3_bobina_esterna'), 3);
+});
+
+test('getExternalSpoolIndex: external_spool_2 returns 2', () => {
+  assertEqual(getExternalSpoolIndex('sensor.h2c_external_spool_2_bobina_esterna'), 2);
+});
+
+test('getExternalSpoolIndex: older format (no prefix) returns 1', () => {
+  assertEqual(getExternalSpoolIndex('sensor.p1s_externe_spule'), 1);
+});
+
+test('getExternalSpoolIndex: English external_spool returns 1', () => {
+  assertEqual(getExternalSpoolIndex('sensor.x1c_external_spool'), 1);
+});
+
+// =============================================================================
+// H2C Multi-AMS + AMS HT Collision Tests (GitHub Issue #35)
+// =============================================================================
+
+console.log('\n=== H2C AMS HT Collision Tests (GitHub Issue #35) ===\n');
+
+test('H2C: Regular AMS 1 + AMS 2 + AMS HT should NOT collide', () => {
+  // Simulates a printer with regular AMS 1, AMS 2, and AMS HT
+  const ams1 = matchAmsHumidityEntity('sensor.h2c_ams_1_humidity');
+  const ams2 = matchAmsHumidityEntity('sensor.h2c_ams_2_humidity');
+  const amsHt = matchAmsHumidityEntity('sensor.h2c_ams_ht_1_umidita');
+  assertEqual(ams1, '1');
+  assertEqual(ams2, '2');
+  assertEqual(amsHt, '128');
+  // All three must be distinct
+  if (ams1 === amsHt) throw new Error('AMS 1 and AMS HT should have different numbers');
+  if (ams2 === amsHt) throw new Error('AMS 2 and AMS HT should have different numbers');
+});
+
+test('H2C: AMS HT trays should NOT be assigned to regular AMS 1', () => {
+  // AMS HT type-first entity should NOT match when looking for amsNumber '1'
+  const trayPattern1 = buildTrayPattern('h2c', '1', 1);
+  const htEntity = 'sensor.h2c_ams_ht_1_tray_1';
+  const match = htEntity.match(trayPattern1);
+  if (match) throw new Error('AMS HT tray should not match when querying for amsNumber="1"');
+});
+
+test('H2C: AMS HT trays SHOULD match when querying for amsNumber 128', () => {
+  const trayPattern128 = buildTrayPattern('h2c', '128', 1);
+  const htEntity = 'sensor.h2c_ams_ht_1_tray_1';
+  const match = htEntity.match(trayPattern128);
+  if (!match) throw new Error('AMS HT tray should match when querying for amsNumber="128"');
 });
 
 // =============================================================================

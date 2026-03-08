@@ -143,10 +143,10 @@ export async function GET() {
             }
           }
         }
-        if (printer.external_spool) {
-          const assignedSpool = traySpoolMap.get(printer.external_spool.entity_id);
+        for (const extSpool of printer.external_spools) {
+          const assignedSpool = traySpoolMap.get(extSpool.entity_id);
           if (assignedSpool) {
-            const extRecord = printer.external_spool as unknown as Record<string, unknown>;
+            const extRecord = extSpool as unknown as Record<string, unknown>;
             extRecord.assigned_spool = assignedSpool;
 
             // External spool doesn't have RFID reader, so no mismatch detection

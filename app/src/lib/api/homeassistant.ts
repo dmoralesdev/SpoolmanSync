@@ -14,6 +14,7 @@ import {
   buildPrintWeightPattern,
   buildPrintProgressPattern,
   cleanFriendlyName,
+  getExternalSpoolIndex,
   // Prefix-agnostic matchers for device-based discovery
   matchAmsHumidityEntity,
   matchTrayEntity,
@@ -46,7 +47,7 @@ export interface HAPrinter {
   name: string;
   state: string;
   ams_units: HAAMS[];
-  external_spool?: HATray;
+  external_spools: HATray[];
   // Additional entities needed for automation YAML generation
   // These are discovered dynamically to handle localized entity names
   current_stage_entity?: string;
@@ -63,6 +64,7 @@ export interface HAAMS {
 export interface HATray {
   entity_id: string;
   tray_number: number;
+  is_external?: boolean;  // True for external spool slots
   name?: string;  // Filament name from RFID (e.g., "Matte Dark Blue")
   color?: string;
   material?: string;
@@ -713,6 +715,7 @@ export class HomeAssistantClient {
         name: cleanFriendlyName(printerState.attributes.friendly_name as string, prefix),
         state: printerState.state,
         ams_units: [],
+        external_spools: [],
       };
 
       // Find AMS units for this printer
@@ -773,7 +776,21 @@ export class HomeAssistantClient {
         // Try prefix-based pattern first, fall back to prefix-agnostic matchers
         // AMS number is optional in pattern - A1 with AMS Lite uses "_ams_" without a number
         const amsMatch = amsState.entity_id.match(amsPattern);
-        let amsNumber: string | null = amsMatch ? (amsMatch[1] || amsMatch[2] || '1') : null;
+        let amsNumber: string | null = null;
+        if (amsMatch) {
+          if (amsMatch[4]) {
+            // Group 4: AMS HT type-first number (ams_ht_N_) — offset by 127
+            amsNumber = String(127 + parseInt(amsMatch[4], 10));
+          } else if (amsMatch[3] === 'ht') {
+            // Group 3: standalone "ht" — use 128
+            amsNumber = '128';
+          } else if (amsMatch[1] && amsState.entity_id.includes('_ams_' + amsMatch[1] + '_ht_')) {
+            // Group 1 with ht suffix: number-first format (ams_N_ht_) — offset by 127
+            amsNumber = String(127 + parseInt(amsMatch[1], 10));
+          } else {
+            amsNumber = amsMatch[1] || amsMatch[2] || amsMatch[3] || '1';
+          }
+        }
         // If prefix-based didn't match, try humidity matcher
         if (!amsNumber) {
           amsNumber = matchAmsHumidityEntity(amsState.entity_id);
@@ -809,9 +826,10 @@ export class HomeAssistantClient {
           return best;
         });
 
+        const numAms = parseInt(amsNumber, 10);
         const ams: HAAMS = {
           entity_id: bestAmsState.entity_id,
-          name: `AMS ${amsNumber}`,
+          name: numAms >= 128 ? 'AMS HT' : `AMS ${amsNumber}`,
           trays: [],
         };
 
@@ -861,7 +879,8 @@ export class HomeAssistantClient {
         printer.ams_units.push(ams);
       }
 
-      // Find external spool using centralized localized patterns
+      // Find external spools using centralized localized patterns
+      // H2C printers may have multiple external spools (externalspool, externalspool2, etc.)
       // See src/lib/entity-patterns.ts to add support for more languages
       const extPattern = buildExternalSpoolPattern(prefix);
       let extCandidates = states.filter(s => extPattern.test(s.entity_id));
@@ -874,29 +893,44 @@ export class HomeAssistantClient {
       }
 
       if (extCandidates.length > 0) {
-        // Pick the best: prefer available, then prefer highest suffix number
-        const bestExt = extCandidates.reduce((best, current) => {
-          const bestAvailable = best.state !== 'unavailable' && best.state !== 'unknown';
-          const currentAvailable = current.state !== 'unavailable' && current.state !== 'unknown';
+        // Group by external spool index (1, 2, etc.)
+        const extByIndex = new Map<number, HAState[]>();
+        for (const ext of extCandidates) {
+          const idx = getExternalSpoolIndex(ext.entity_id);
+          if (!extByIndex.has(idx)) {
+            extByIndex.set(idx, []);
+          }
+          extByIndex.get(idx)!.push(ext);
+        }
 
-          if (currentAvailable && !bestAvailable) return current;
-          if (bestAvailable && !currentAvailable) return best;
+        // Pick the best candidate per index, sorted by index
+        const sortedIndices = [...extByIndex.keys()].sort((a, b) => a - b);
+        for (const idx of sortedIndices) {
+          const candidates = extByIndex.get(idx)!;
+          const bestExt = candidates.reduce((best, current) => {
+            const bestAvailable = best.state !== 'unavailable' && best.state !== 'unknown';
+            const currentAvailable = current.state !== 'unavailable' && current.state !== 'unknown';
 
-          const currentSuffix = getEntitySuffix(current.entity_id);
-          const bestSuffix = getEntitySuffix(best.entity_id);
-          if (currentSuffix > bestSuffix) return current;
-          return best;
-        });
+            if (currentAvailable && !bestAvailable) return current;
+            if (bestAvailable && !currentAvailable) return best;
 
-        printer.external_spool = {
-          entity_id: bestExt.entity_id,
-          tray_number: 0,
-          name: bestExt.attributes.name as string,
-          color: bestExt.attributes.color as string,
-          material: bestExt.attributes.type as string,
-          tray_uuid: bestExt.attributes.tray_uuid as string,  // Spool serial number
-          remaining_weight: bestExt.attributes.remain as number,
-        };
+            const currentSuffix = getEntitySuffix(current.entity_id);
+            const bestSuffix = getEntitySuffix(best.entity_id);
+            if (currentSuffix > bestSuffix) return current;
+            return best;
+          });
+
+          printer.external_spools.push({
+            entity_id: bestExt.entity_id,
+            tray_number: 0,
+            is_external: true,
+            name: bestExt.attributes.name as string,
+            color: bestExt.attributes.color as string,
+            material: bestExt.attributes.type as string,
+            tray_uuid: bestExt.attributes.tray_uuid as string,
+            remaining_weight: bestExt.attributes.remain as number,
+          });
+        }
       }
 
       // Discover additional entities needed for automation YAML generation

@@ -173,7 +173,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
     }
   };
 
-  const trayLabel = tray.tray_number === 0 ? 'External' : `Tray ${tray.tray_number}`;
+  const trayLabel = tray.is_external ? 'External' : `Tray ${tray.tray_number}`;
 
   // Check if any enabled filters have values to show
   const hasFilterOptions = enabledFields.some(f => f.values.length > 0);
@@ -266,7 +266,7 @@ export function TraySlot({ tray, assignedSpool, spools, onAssign, onUnassign, mi
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            Assign Spool to {tray.tray_number === 0 ? 'External Slot' : `Tray ${tray.tray_number}`}
+            Assign Spool to {tray.is_external ? 'External Slot' : `Tray ${tray.tray_number}`}
           </DialogTitle>
           <DialogDescription>
             Search and select a spool from your Spoolman inventory.

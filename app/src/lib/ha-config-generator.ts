@@ -84,24 +84,30 @@ export function generateHAConfig(
       current_stage: printer.current_stage_entity || '',
       print_weight: printer.print_weight_entity || '',
       print_progress: printer.print_progress_entity || '',
-      external_spool: printer.external_spool?.entity_id || '',
+      external_spools: printer.external_spools.map(es => es.entity_id),
     };
 
     // Collect all trays from all AMS units
     const allTrays: TrayInfo[] = [];
 
-    if (printer.external_spool) {
+    // External spools: compositeId 0, 1, 2, ... (backward compatible — first is 0)
+    for (let i = 0; i < printer.external_spools.length; i++) {
       allTrays.push({
-        entityId: printer.external_spool.entity_id,
+        entityId: printer.external_spools[i].entity_id,
         amsNumber: 0,
         trayNumber: 0,
-        compositeId: 0,
+        compositeId: i,
       });
     }
 
     for (const ams of printer.ams_units) {
-      const amsMatch = ams.entity_id.match(/_ams_(\d+|lite)_/);
-      const amsNumber = amsMatch ? (amsMatch[1] === 'lite' ? 1 : parseInt(amsMatch[1], 10)) : 1;
+      // Extract AMS number, handling type-first format (ams_pro_2_, ams_ht_1_)
+      const amsMatch = ams.entity_id.match(/_ams_(?:(?:pro|ht)_)?(\d+|lite)(?:_(?:pro|ht))?_/);
+      let amsNumber = amsMatch ? (amsMatch[1] === 'lite' ? 1 : parseInt(amsMatch[1], 10)) : 1;
+      // Apply HT offset if entity contains _ams_ht_ and number < 128
+      if (amsNumber < 128 && ams.entity_id.includes('_ams_ht_')) {
+        amsNumber = 127 + amsNumber;
+      }
       for (const tray of ams.trays) {
         allTrays.push({
           entityId: tray.entity_id,
@@ -154,7 +160,7 @@ interface LocalizedEntities {
   current_stage: string;
   print_weight: string;
   print_progress: string;
-  external_spool: string;
+  external_spools: string[];
 }
 
 /**
@@ -405,52 +411,35 @@ ${trayEntityIds.map(id => `        - ${id}`).join('\n')}
  * Build Jinja2 template to detect active tray from all AMS units
  * Returns composite ID: 0 = external, 11-14 = AMS1, 21-24 = AMS2, etc.
  *
- * Note: The external spool entity in ha-bambulab does NOT have an 'active'
- * attribute (only AMS trays have it). So external spool detection works by:
- * - No AMS trays: external spool is active when it has filament loaded
- * - With AMS trays: external spool is active when no AMS tray has active=true
- *   and external spool has filament loaded
+ * External spools use the 'active' attribute same as AMS trays
+ * (requires ha-bambulab 2.0.29+).
  */
 function buildActiveTrayDetection(allTrays: TrayInfo[]): string {
   const checks: string[] = [];
 
-  const externalTray = allTrays.find(t => t.compositeId === 0);
+  const externalTrays = allTrays.filter(t => t.amsNumber === 0);
   const amsTrays = allTrays.filter(t => t.amsNumber > 0).sort((a, b) => a.compositeId - b.compositeId);
 
-  if (externalTray) {
-    if (amsTrays.length > 0) {
-      // AMS + external spool: external is active when no AMS tray has active=true
-      // Uses Jinja2 namespace() to track state across loop iterations
-      const amsActiveChecks = amsTrays.map(t =>
-        `{%- if state_attr('${t.entityId}', 'active') in [true, 'true', 'True'] -%}{%- set ns.ams_active = true -%}{%- endif -%}`
-      ).join('\n          ');
+  if (externalTrays.length > 0) {
+    checks.push(`
+          {# Check external spool(s) #}`);
+    for (const ext of externalTrays) {
       checks.push(`
-          {# External spool - active when no AMS tray is active and filament is loaded #}
-          {%- set ns = namespace(ams_active=false) -%}
-          ${amsActiveChecks}
-          {% set ext_name = state_attr('${externalTray.entityId}', 'name') | default('') | string | lower | trim %}
-          {% if not ns.ams_active and ext_name not in ['empty', '', 'unknown'] %}
-            0
-          {% endif %}`);
-    } else {
-      // External spool only (no AMS) - always active when filament is loaded
-      checks.push(`
-          {# External spool (only tray) - active when filament is loaded #}
-          {% set ext_name = state_attr('${externalTray.entityId}', 'name') | default('') | string | lower | trim %}
-          {% if ext_name not in ['empty', '', 'unknown'] %}
-            0
+          {% if state_attr('${ext.entityId}', 'active') in [true, 'true', 'True'] %}
+            ${ext.compositeId}
           {% endif %}`);
     }
   }
 
   // Check each AMS tray explicitly using discovered entity IDs
   if (amsTrays.length > 0) {
-    const amsNumbers = [...new Set(amsTrays.map(t => t.amsNumber))].sort();
+    const amsNumbers = [...new Set(amsTrays.map(t => t.amsNumber))].sort((a, b) => a - b);
 
     for (const amsNumber of amsNumbers) {
       const traysForAms = amsTrays.filter(t => t.amsNumber === amsNumber);
+      const displayName = amsNumber >= 128 ? 'AMS HT' : `AMS${amsNumber}`;
       checks.push(`
-          {# Check AMS${amsNumber} trays #}`);
+          {# Check ${displayName} trays #}`);
 
       for (const tray of traysForAms) {
         checks.push(`
