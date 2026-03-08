@@ -94,18 +94,27 @@ export function UsageOverTime({ data, spools, bucket }: UsageOverTimeProps) {
   // Build chart data based on filter
   const chartData = useMemo(() => {
     if (selectedSpoolId !== null) {
-      // Single spool: just show that spool's weight per bucket
+      // Single spool: show that spool's weight per bucket (keep zero-fill days)
       return data.map(tb => ({
         date: tb.date,
         totalWeight: tb.bySpoolId[selectedSpoolId] || 0,
-      })).filter(d => d.totalWeight > 0);
+      }));
     }
 
     // All spools: build stacked data with a key per spool
+    // Collect all spool IDs across the entire dataset
+    const allIds = new Set<string>();
+    for (const tb of data) {
+      for (const idStr of Object.keys(tb.bySpoolId)) {
+        allIds.add(idStr);
+      }
+    }
+
+    // Ensure every row has every spool key (missing = 0) for proper stacking
     return data.map(tb => {
       const row: Record<string, unknown> = { date: tb.date };
-      for (const [idStr, weight] of Object.entries(tb.bySpoolId)) {
-        row[`spool_${idStr}`] = weight;
+      for (const idStr of allIds) {
+        row[`spool_${idStr}`] = tb.bySpoolId[Number(idStr)] || 0;
       }
       return row;
     });

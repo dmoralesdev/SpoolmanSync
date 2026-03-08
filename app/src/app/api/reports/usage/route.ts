@@ -158,7 +158,33 @@ export async function GET(request: NextRequest) {
     bySpool.sort((a, b) => b.totalWeight - a.totalWeight);
 
     // Sort time buckets chronologically
-    const overTime = Array.from(timeMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const sortedBuckets = Array.from(timeMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Fill gaps with zero-value entries so the chart has a continuous x-axis
+    const overTime: TimeBucket[] = [];
+    if (sortedBuckets.length > 0) {
+      const first = sortedBuckets[0].date;
+      const last = sortedBuckets[sortedBuckets.length - 1].date;
+      const existingMap = new Map(sortedBuckets.map(b => [b.date, b]));
+
+      const [fy, fm, fd] = first.split('-').map(Number);
+      const [ly, lm, ld] = last.split('-').map(Number);
+      const current = new Date(fy, fm - 1, fd);
+      const end = new Date(ly, lm - 1, ld);
+      const step = bucket === 'week' ? 7 : 1;
+
+      while (current <= end) {
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        const key = `${y}-${m}-${d}`;
+
+        const existing = existingMap.get(key);
+        overTime.push(existing || { date: key, totalWeight: 0, bySpoolId: {} });
+
+        current.setDate(current.getDate() + step);
+      }
+    }
 
     // Round weights in time buckets
     for (const tb of overTime) {
