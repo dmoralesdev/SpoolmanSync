@@ -71,6 +71,11 @@ const humidityTestCases: TestCase[] = [
   // AMS number-first with ht suffix (ams_1_ht_humidity)
   { name: 'AMS HT number-first suffix', entityId: 'sensor.h2c_ams_1_ht_humidity', expected: '128' },
 
+  // Compact HT naming without _ams_ prefix (e.g., sensor.h2c_ht1_humidity)
+  { name: 'Compact HT 1 English', entityId: 'sensor.h2c_ht1_humidity', expected: '128' },
+  { name: 'Compact HT 2 English', entityId: 'sensor.h2c_ht2_humidity', expected: '129' },
+  { name: 'Compact HT 1 Italian', entityId: 'sensor.h2c_ht1_umidita', expected: '128' },
+
   // Renamed entities with no printer prefix (GitHub Issue #9 comment)
   { name: 'No prefix - ams_humidity', entityId: 'sensor.ams_humidity', expected: '1' },
   { name: 'No prefix - ams_1_humidity', entityId: 'sensor.ams_1_humidity', expected: '1' },
@@ -128,6 +133,11 @@ const trayTestCases: TrayTestCase[] = [
   // AMS number-first with ht suffix (ams_1_ht_tray_N)
   { name: 'AMS HT number-first suffix Tray 1', entityId: 'sensor.h2c_ams_1_ht_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
 
+  // Compact HT naming without _ams_ prefix (e.g., sensor.h2c_ht1_tray_1)
+  { name: 'Compact HT 1 Tray 1', entityId: 'sensor.h2c_ht1_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
+  { name: 'Compact HT 1 Slot 2 German', entityId: 'sensor.h2c_ht1_slot_2', expected: { amsNumber: '128', trayNumber: 2 } },
+  { name: 'Compact HT 2 Tray 1', entityId: 'sensor.h2c_ht2_tray_1', expected: { amsNumber: '129', trayNumber: 1 } },
+
   // Renamed entities with no printer prefix (GitHub Issue #9 comment)
   { name: 'No prefix - ams_tray_1', entityId: 'sensor.ams_tray_1', expected: { amsNumber: '1', trayNumber: 1 } },
   { name: 'No prefix - ams_tray_4', entityId: 'sensor.ams_tray_4', expected: { amsNumber: '1', trayNumber: 4 } },
@@ -164,6 +174,8 @@ const buildAmsPatternTestCases: BuildPatternTestCase[] = [
   { name: 'AMS HT type-first match', prefix: 'h2c', entityId: 'sensor.h2c_ams_ht_1_humidity', shouldMatch: true, expectedAmsNumber: '128' },
   { name: 'AMS HT type-first #2', prefix: 'h2c', entityId: 'sensor.h2c_ams_ht_2_humidity', shouldMatch: true, expectedAmsNumber: '129' },
   { name: 'AMS Lite match', prefix: 'a1_mini', entityId: 'sensor.a1_mini_ams_lite_humidity', shouldMatch: true, expectedAmsNumber: 'lite' },
+  { name: 'Compact HT match', prefix: 'h2c', entityId: 'sensor.h2c_ht1_humidity', shouldMatch: true, expectedAmsNumber: '128' },
+  { name: 'Compact HT 2 match', prefix: 'h2c', entityId: 'sensor.h2c_ht2_humidity', shouldMatch: true, expectedAmsNumber: '129' },
   { name: 'Wrong prefix no match', prefix: 'x1c', entityId: 'sensor.p1s_ams_1_humidity', shouldMatch: false },
 ];
 
@@ -191,6 +203,9 @@ const buildTrayPatternTestCases: BuildTrayPatternTestCase[] = [
   { name: 'AMS HT tray match (ams_ht_1)', prefix: 'h2c', amsNumber: '128', trayNum: 1, entityId: 'sensor.h2c_ams_ht_1_tray_1', shouldMatch: true },
   { name: 'AMS HT tray match (ams_ht standalone)', prefix: 'a1_mini', amsNumber: '128', trayNum: 1, entityId: 'sensor.a1_mini_ams_ht_tray_1', shouldMatch: true },
   { name: 'AMS HT slot match (ams_ht_1)', prefix: 'h2c', amsNumber: '128', trayNum: 2, entityId: 'sensor.h2c_ams_ht_1_slot_2', shouldMatch: true },
+  // Compact HT naming (ht1_tray_N without _ams_)
+  { name: 'Compact HT tray match', prefix: 'h2c', amsNumber: '128', trayNum: 1, entityId: 'sensor.h2c_ht1_tray_1', shouldMatch: true },
+  { name: 'Compact HT slot match', prefix: 'h2c', amsNumber: '128', trayNum: 2, entityId: 'sensor.h2c_ht1_slot_2', shouldMatch: true },
   // AMS HT should NOT match amsNumber=1
   { name: 'AMS HT should not match amsNumber=1', prefix: 'h2c', amsNumber: '1', trayNum: 1, entityId: 'sensor.h2c_ams_ht_1_tray_1', shouldMatch: false },
   { name: 'AMS Lite no number match', prefix: 'schiller', amsNumber: '1', trayNum: 1, entityId: 'sensor.schiller_ams_tray_1', shouldMatch: true },
@@ -335,8 +350,12 @@ for (const tc of buildAmsPatternTestCases) {
       if (tc.expectedAmsNumber) {
         // Group 1 = number (number-first), Group 2 = number (type-first pro)
         // Group 3 = "lite" or "ht" (standalone), Group 4 = number (type-first ht)
+        // Group 5 = number (compact ht without _ams_)
         let amsNum: string;
-        if (match[4]) {
+        if (match[5]) {
+          // Compact HT: offset by 127
+          amsNum = String(127 + parseInt(match[5], 10));
+        } else if (match[4]) {
           // HT type-first: offset by 127
           amsNum = String(127 + parseInt(match[4], 10));
         } else if (match[3] === 'ht') {
@@ -665,6 +684,55 @@ test('H2C: AMS HT trays SHOULD match when querying for amsNumber 128', () => {
   const htEntity = 'sensor.h2c_ams_ht_1_tray_1';
   const match = htEntity.match(trayPattern128);
   if (!match) throw new Error('AMS HT tray should match when querying for amsNumber="128"');
+});
+
+// =============================================================================
+// H2C Compact HT Entity Naming (GitHub Issue #35 - stogs)
+// =============================================================================
+
+console.log('\n=== H2C Compact HT Entity Naming (stogs) ===\n');
+
+// stogs' H2C uses compact HT naming: ht1_ instead of ams_ht_1_ or ams_128_
+const stogsEntities = [
+  'sensor.h2c_ht1_humidity',
+  'sensor.h2c_ht1_tray_1',
+  'sensor.h2c_ht1_tray_2',
+  'sensor.h2c_ht1_tray_3',
+  'sensor.h2c_ht1_tray_4',
+];
+
+test('stogs H2C: Compact HT humidity sensor detected as AMS 128', () => {
+  const result = matchAmsHumidityEntity('sensor.h2c_ht1_humidity');
+  assertEqual(result, '128');
+});
+
+test('stogs H2C: All 4 compact HT trays detected', () => {
+  for (let i = 1; i <= 4; i++) {
+    const trayResult = matchTrayEntity(`sensor.h2c_ht1_tray_${i}`);
+    if (!trayResult) throw new Error(`Tray ${i} not detected`);
+    if (trayResult.amsNumber !== '128') throw new Error(`Expected AMS 128, got ${trayResult.amsNumber}`);
+    if (trayResult.trayNumber !== i) throw new Error(`Expected tray ${i}, got ${trayResult.trayNumber}`);
+  }
+});
+
+test('stogs H2C: buildAmsPattern matches compact HT', () => {
+  const pattern = buildAmsPattern('h2c');
+  const match = 'sensor.h2c_ht1_humidity'.match(pattern);
+  if (!match) throw new Error('buildAmsPattern should match compact HT');
+});
+
+test('stogs H2C: buildTrayPattern matches compact HT tray', () => {
+  const pattern = buildTrayPattern('h2c', '128', 1);
+  const match = 'sensor.h2c_ht1_tray_1'.match(pattern);
+  if (!match) throw new Error('buildTrayPattern should match compact HT tray');
+});
+
+test('stogs H2C: Compact HT does not collide with regular AMS', () => {
+  const ams1 = matchAmsHumidityEntity('sensor.h2c_ams_1_humidity');
+  const compactHt = matchAmsHumidityEntity('sensor.h2c_ht1_humidity');
+  assertEqual(ams1, '1');
+  assertEqual(compactHt, '128');
+  if (ams1 === compactHt) throw new Error('Regular AMS and compact HT should have different numbers');
 });
 
 // =============================================================================

@@ -409,7 +409,9 @@ export function buildAmsPattern(prefix: string): RegExp {
   // Group 3: "lite" or "ht" when using standalone naming
   // Group 4: AMS HT number from type-first format (ams_ht_NUMBER_)
   // Group 5: entity version suffix (optional)
-  return new RegExp(`^sensor\\.${prefix}_ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite|ht)_|ht_(\\d+)_)?(?:${names})(?:_(\\d+))?$`);
+  // Group 5: AMS HT number from compact format without _ams_ (ht_NUMBER_)
+  // Group 6: entity version suffix (optional)
+  return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite|ht)_|ht_(\\d+)_)?|ht(\\d+)_)(?:${names})(?:_(\\d+))?$`);
 }
 
 /**
@@ -433,8 +435,8 @@ export function buildTrayPattern(prefix: string, amsNumber: string, trayNum: num
   // e.g., ams_128_tray_1, ams_128_ht_tray_1, ams_ht_1_tray_1, ams_ht_tray_1 (when 128)
   if (numAms >= 128) {
     const htNum = numAms - 127; // 128→1, 129→2, etc.
-    // Match: ams_128_tray_N, ams_128_ht_tray_N, ams_ht_1_tray_N, ams_ht_tray_N (standalone)
-    return new RegExp(`^sensor\\.${prefix}_ams_(?:${amsNumber}(?:_ht)?_|ht_${htNum}_|ht_)(?:${names})_${trayNum}(?:_(\\d+))?$`);
+    // Match: ams_128_tray_N, ams_128_ht_tray_N, ams_ht_1_tray_N, ams_ht_tray_N (standalone), ht1_tray_N (compact)
+    return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:${amsNumber}(?:_ht)?_|ht_${htNum}_|ht_)|ht${htNum}_)(?:${names})_${trayNum}(?:_(\\d+))?$`);
   }
 
   // For A1 with AMS Lite (amsNumber="1"), also match entities without explicit AMS number
@@ -594,6 +596,13 @@ export function getLocalizedEntityName(
 export function matchAmsHumidityEntity(entityId: string): string | null {
   const names = AMS_HUMIDITY_NAMES.join('|');
 
+  // Check for compact HT naming without _ams_ prefix (e.g., sensor.h2c_ht1_humidity)
+  const compactHtPattern = new RegExp(`^sensor\\.(?:.+_)?ht(\\d+)_(?:${names})(?:_\\d+)?$`);
+  const compactHtMatch = entityId.match(compactHtPattern);
+  if (compactHtMatch) {
+    return String(127 + parseInt(compactHtMatch[1], 10));
+  }
+
   // Check for type-first "ams_ht_N_humidity" pattern (e.g., ams_ht_1_umidita)
   // This MUST be checked before the generic pattern to avoid collision with regular AMS numbers
   const htNumberedPattern = new RegExp(`^sensor\\.(?:.+_)?ams_ht_(\\d+)_(?:${names})(?:_\\d+)?$`);
@@ -644,6 +653,16 @@ export function matchAmsHumidityEntity(entityId: string): string | null {
  */
 export function matchTrayEntity(entityId: string): { amsNumber: string; trayNumber: number } | null {
   const names = TRAY_NAMES.join('|');
+
+  // Check for compact HT naming without _ams_ prefix (e.g., sensor.h2c_ht1_tray_1)
+  const compactHtTrayPattern = new RegExp(`^sensor\\.(?:.+_)?ht(\\d+)_(?:${names})_(\\d+)(?:_\\d+)?$`);
+  const compactHtTrayMatch = entityId.match(compactHtTrayPattern);
+  if (compactHtTrayMatch) {
+    return {
+      amsNumber: String(127 + parseInt(compactHtTrayMatch[1], 10)),
+      trayNumber: parseInt(compactHtTrayMatch[2], 10),
+    };
+  }
 
   // Check for type-first "ams_ht_N_tray_M" pattern (e.g., ams_ht_1_slot_1)
   // This MUST be checked before the generic pattern to avoid collision with regular AMS numbers
