@@ -408,10 +408,11 @@ export function buildAmsPattern(prefix: string): RegExp {
   // Group 2: AMS number from type-first format (ams_pro_NUMBER_) — NOT ht, handled by group 4
   // Group 3: "lite" or "ht" when using standalone naming
   // Group 4: AMS HT number from type-first format (ams_ht_NUMBER_)
-  // Group 5: entity version suffix (optional)
   // Group 5: AMS HT number from compact format without _ams_ (ht_NUMBER_)
-  // Group 6: entity version suffix (optional)
-  return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite|ht)_|ht_(\\d+)_)?|ht(\\d+)_)(?:${names})(?:_(\\d+))?$`);
+  // Group 6: AMS unit number from compact AMS model naming (ams\d+_NUMBER_)
+  // Group 7: AMS HT unit number from compact AMS HT naming (amsht_NUMBER_)
+  // Group 8: entity version suffix (optional)
+  return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:(\\d+)(?:_(?:pro|ht))?_|(?:pro)_(\\d+)_|(lite|ht)_|ht_(\\d+)_)?|ht(\\d+)_|ams\\d+_(\\d+)_|amsht_(\\d+)_)(?:${names})(?:_(\\d+))?$`);
 }
 
 /**
@@ -435,17 +436,17 @@ export function buildTrayPattern(prefix: string, amsNumber: string, trayNum: num
   // e.g., ams_128_tray_1, ams_128_ht_tray_1, ams_ht_1_tray_1, ams_ht_tray_1 (when 128)
   if (numAms >= 128) {
     const htNum = numAms - 127; // 128→1, 129→2, etc.
-    // Match: ams_128_tray_N, ams_128_ht_tray_N, ams_ht_1_tray_N, ams_ht_tray_N (standalone), ht1_tray_N (compact)
-    return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:${amsNumber}(?:_ht)?_|ht_${htNum}_|ht_)|ht${htNum}_)(?:${names})_${trayNum}(?:_(\\d+))?$`);
+    // Match: ams_128_tray_N, ams_128_ht_tray_N, ams_ht_1_tray_N, ams_ht_tray_N (standalone), ht1_tray_N (compact), amsht_1_tray_N (compact)
+    return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:${amsNumber}(?:_ht)?_|ht_${htNum}_|ht_)|ht${htNum}_|amsht_${htNum}_)(?:${names})_${trayNum}(?:_(\\d+))?$`);
   }
 
   // For A1 with AMS Lite (amsNumber="1"), also match entities without explicit AMS number
   // e.g., "sensor.schiller_ams_tray_1" in addition to "sensor.schiller_ams_1_tray_1"
   // Note: "ht" is NOT included in type alternatives — AMS HT is handled above
   if (amsNumber === '1') {
-    return new RegExp(`^sensor\\.${prefix}_ams_(?:1(?:_(?:pro))?_|(?:pro)_1_)?(?:${names})_${trayNum}(?:_(\\d+))?$`);
+    return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:1(?:_(?:pro))?_|(?:pro)_1_)?|ams\\d+_1_)(?:${names})_${trayNum}(?:_(\\d+))?$`);
   }
-  return new RegExp(`^sensor\\.${prefix}_ams_(?:${amsNumber}(?:_(?:pro))?|(?:pro)_${amsNumber})_(?:${names})_${trayNum}(?:_(\\d+))?$`);
+  return new RegExp(`^sensor\\.${prefix}_(?:ams_(?:${amsNumber}(?:_(?:pro))?|(?:pro)_${amsNumber})|ams\\d+_${amsNumber})_(?:${names})_${trayNum}(?:_(\\d+))?$`);
 }
 
 /**
@@ -461,8 +462,9 @@ export function buildExternalSpoolPattern(prefix: string): RegExp {
   // Transform names to handle numbered external spool prefixes
   const namePatterns = EXTERNAL_SPOOL_NAMES.map(name => {
     // Add optional digit(s) after common prefix patterns
+    // Supports: externalspool_ (no number), externalspool2_ (H2C), externalspool_1_ (H2D)
     return name
-      .replace(/^externalspool_/, 'externalspool\\d*_')
+      .replace(/^externalspool_/, 'externalspool(?:\\d+|_\\d+)?_')
       .replace(/^external_spool_/, 'external_spool_?\\d*_?');
   });
   // Deduplicate patterns that became identical after transformation
@@ -596,6 +598,20 @@ export function getLocalizedEntityName(
 export function matchAmsHumidityEntity(entityId: string): string | null {
   const names = AMS_HUMIDITY_NAMES.join('|');
 
+  // Check for compact AMS model naming (e.g., sensor.h2d_ams2_1_humidity)
+  const compactAmsPattern = new RegExp(`^sensor\\.(?:.+_)?ams\\d+_(\\d+)_(?:${names})(?:_\\d+)?$`);
+  const compactAmsMatch = entityId.match(compactAmsPattern);
+  if (compactAmsMatch) {
+    return compactAmsMatch[1];
+  }
+
+  // Check for compact AMS HT naming (e.g., sensor.h2d_amsht_1_humidity)
+  const compactAmsHtPattern = new RegExp(`^sensor\\.(?:.+_)?amsht_(\\d+)_(?:${names})(?:_\\d+)?$`);
+  const compactAmsHtMatch = entityId.match(compactAmsHtPattern);
+  if (compactAmsHtMatch) {
+    return String(127 + parseInt(compactAmsHtMatch[1], 10));
+  }
+
   // Check for compact HT naming without _ams_ prefix (e.g., sensor.h2c_ht1_humidity)
   const compactHtPattern = new RegExp(`^sensor\\.(?:.+_)?ht(\\d+)_(?:${names})(?:_\\d+)?$`);
   const compactHtMatch = entityId.match(compactHtPattern);
@@ -653,6 +669,26 @@ export function matchAmsHumidityEntity(entityId: string): string | null {
  */
 export function matchTrayEntity(entityId: string): { amsNumber: string; trayNumber: number } | null {
   const names = TRAY_NAMES.join('|');
+
+  // Check for compact AMS model naming (e.g., sensor.h2d_ams2_1_tray_1)
+  const compactAmsTrayPattern = new RegExp(`^sensor\\.(?:.+_)?ams\\d+_(\\d+)_(?:${names})_(\\d+)(?:_\\d+)?$`);
+  const compactAmsTrayMatch = entityId.match(compactAmsTrayPattern);
+  if (compactAmsTrayMatch) {
+    return {
+      amsNumber: compactAmsTrayMatch[1],
+      trayNumber: parseInt(compactAmsTrayMatch[2], 10),
+    };
+  }
+
+  // Check for compact AMS HT naming (e.g., sensor.h2d_amsht_1_tray_1)
+  const compactAmsHtTrayPattern = new RegExp(`^sensor\\.(?:.+_)?amsht_(\\d+)_(?:${names})_(\\d+)(?:_\\d+)?$`);
+  const compactAmsHtTrayMatch = entityId.match(compactAmsHtTrayPattern);
+  if (compactAmsHtTrayMatch) {
+    return {
+      amsNumber: String(127 + parseInt(compactAmsHtTrayMatch[1], 10)),
+      trayNumber: parseInt(compactAmsHtTrayMatch[2], 10),
+    };
+  }
 
   // Check for compact HT naming without _ams_ prefix (e.g., sensor.h2c_ht1_tray_1)
   const compactHtTrayPattern = new RegExp(`^sensor\\.(?:.+_)?ht(\\d+)_(?:${names})_(\\d+)(?:_\\d+)?$`);
@@ -721,7 +757,7 @@ export function matchTrayEntity(entityId: string): { amsNumber: string; trayNumb
 export function matchExternalSpoolEntity(entityId: string): boolean {
   const namePatterns = EXTERNAL_SPOOL_NAMES.map(name => {
     return name
-      .replace(/^externalspool_/, 'externalspool\\d*_')
+      .replace(/^externalspool_/, 'externalspool(?:\\d+|_\\d+)?_')
       .replace(/^external_spool_/, 'external_spool_?\\d*_?');
   });
   const uniquePatterns = [...new Set(namePatterns)];
@@ -742,6 +778,11 @@ export function getExternalSpoolIndex(entityId: string): number {
   const numberedMatch = entityId.match(/_externalspool(\d+)_/);
   if (numberedMatch) {
     return parseInt(numberedMatch[1], 10);
+  }
+  // Check for H2D-style: externalspool_1_, externalspool_2_
+  const underscoreNumberedMatch = entityId.match(/_externalspool_(\d+)_/);
+  if (underscoreNumberedMatch) {
+    return parseInt(underscoreNumberedMatch[1], 10);
   }
   // Check for numbered underscore pattern: external_spool_2_, etc.
   const underscoredMatch = entityId.match(/_external_spool_(\d+)_/);
