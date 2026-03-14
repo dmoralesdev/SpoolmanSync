@@ -5,6 +5,12 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-03-14
+
+### Fixed
+- AMS entity detection for H2D printers using compact naming format (e.g., `sensor.h2d_ams2_1_humidity`, `sensor.h2d_amsht_1_humidity`) (#45, #47)
+- External spool detection for H2D printers using underscore+digit naming (e.g., `sensor.h2d_externalspool_1_external_spool`) (#45, #47)
+
 ## [1.3.3] - 2026-03-08
 
 ### Fixed
