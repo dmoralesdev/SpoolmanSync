@@ -5,6 +5,11 @@ All notable changes to SpoolmanSync will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-03-14
+
+### Fixed
+- AMS discovery for user-renamed AMS devices with custom names (e.g., `ams_links_`, `ams_rechts_`, `ams_left_`, `ams_right_`) now works via device-based fallback (#47)
+
 ## [1.3.4] - 2026-03-14
 
 ### Fixed
