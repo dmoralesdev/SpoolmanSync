@@ -92,6 +92,12 @@ const humidityTestCases: TestCase[] = [
   { name: 'No prefix - ams_ht_humidity', entityId: 'sensor.ams_ht_humidity', expected: '128' },
   { name: 'No prefix - ams_luftfeuchtigkeit', entityId: 'sensor.ams_luftfeuchtigkeit', expected: '1' },
 
+  // User-renamed AMS devices (e.g., German left/right)
+  { name: 'Renamed AMS "links" (left)', entityId: 'sensor.h2d_ams_links_humidity', expected: 'links' },
+  { name: 'Renamed AMS "rechts" (right)', entityId: 'sensor.h2d_ams_rechts_humidity', expected: 'rechts' },
+  { name: 'Renamed AMS "left"', entityId: 'sensor.h2d_ams_left_humidity', expected: 'left' },
+  { name: 'Renamed AMS "right"', entityId: 'sensor.h2d_ams_right_humidity', expected: 'right' },
+
   // Edge cases - should NOT match
   { name: 'Invalid - no ams', entityId: 'sensor.x1c_humidity', expected: null },
   { name: 'Invalid - wrong type', entityId: 'sensor.x1c_ams_1_temperature', expected: null },
@@ -158,6 +164,11 @@ const trayTestCases: TrayTestCase[] = [
   { name: 'No prefix - ams_128_tray_1', entityId: 'sensor.ams_128_tray_1', expected: { amsNumber: '128', trayNumber: 1 } },
   { name: 'No prefix - ams_ht_tray_2', entityId: 'sensor.ams_ht_tray_2', expected: { amsNumber: '128', trayNumber: 2 } },
   { name: 'No prefix - ams_slot_1 German', entityId: 'sensor.ams_slot_1', expected: { amsNumber: '1', trayNumber: 1 } },
+
+  // User-renamed AMS devices (e.g., German left/right)
+  { name: 'Renamed AMS "links" Tray 1', entityId: 'sensor.h2d_ams_links_tray_1', expected: { amsNumber: 'links', trayNumber: 1 } },
+  { name: 'Renamed AMS "rechts" Tray 4', entityId: 'sensor.h2d_ams_rechts_tray_4', expected: { amsNumber: 'rechts', trayNumber: 4 } },
+  { name: 'Renamed AMS "links" Slot 2', entityId: 'sensor.h2d_ams_links_slot_2', expected: { amsNumber: 'links', trayNumber: 2 } },
 
   // Edge cases - should NOT match
   { name: 'Invalid - no tray number', entityId: 'sensor.x1c_ams_1_tray', expected: null },
@@ -873,6 +884,97 @@ test('H2D: All entities from issue #45 are discovered', () => {
   assertEqual(humidityCount, 2); // ams2 + amsht
   assertEqual(trayCount, 8); // 4 ams2 trays + 4 amsht trays
   assertEqual(externalCount, 1);
+});
+
+// =============================================================================
+// User-Renamed AMS Devices (GitHub Issue #47 - Somaxax)
+// =============================================================================
+
+console.log('\n=== User-Renamed AMS Devices (GitHub Issue #47 - Somaxax) ===\n');
+
+// Somaxax's H2D entity list from issue #47 — AMS devices renamed to "links"/"rechts"
+const somaxaxEntities = [
+  'sensor.h2d_ams_links_humidity',
+  'sensor.h2d_ams_links_humidity_index',
+  'sensor.h2d_ams_links_remaining_drying_time',
+  'sensor.h2d_ams_links_temperature',
+  'sensor.h2d_ams_links_tray_1',
+  'sensor.h2d_ams_links_tray_2',
+  'sensor.h2d_ams_links_tray_3',
+  'sensor.h2d_ams_links_tray_4',
+  'sensor.h2d_ams_rechts_humidity',
+  'sensor.h2d_ams_rechts_humidity_index',
+  'sensor.h2d_ams_rechts_remaining_drying_time',
+  'sensor.h2d_ams_rechts_temperature',
+  'sensor.h2d_ams_rechts_tray_1',
+  'sensor.h2d_ams_rechts_tray_2',
+  'sensor.h2d_ams_rechts_tray_3',
+  'sensor.h2d_ams_rechts_tray_4',
+  'sensor.h2d_externalspool_external_spool',
+  'sensor.h2d_externalspool2_external_spool',
+];
+
+test('Somaxax H2D: "links" AMS humidity detected', () => {
+  assertEqual(matchAmsHumidityEntity('sensor.h2d_ams_links_humidity'), 'links');
+});
+
+test('Somaxax H2D: "rechts" AMS humidity detected', () => {
+  assertEqual(matchAmsHumidityEntity('sensor.h2d_ams_rechts_humidity'), 'rechts');
+});
+
+test('Somaxax H2D: Non-humidity sensors should NOT match', () => {
+  assertEqual(matchAmsHumidityEntity('sensor.h2d_ams_links_humidity_index'), null);
+  assertEqual(matchAmsHumidityEntity('sensor.h2d_ams_links_remaining_drying_time'), null);
+  assertEqual(matchAmsHumidityEntity('sensor.h2d_ams_links_temperature'), null);
+});
+
+test('Somaxax H2D: All 4 "links" trays detected', () => {
+  for (let i = 1; i <= 4; i++) {
+    const result = matchTrayEntity(`sensor.h2d_ams_links_tray_${i}`);
+    if (!result) throw new Error(`Tray ${i} not detected`);
+    assertEqual(result.amsNumber, 'links');
+    assertEqual(result.trayNumber, i);
+  }
+});
+
+test('Somaxax H2D: All 4 "rechts" trays detected', () => {
+  for (let i = 1; i <= 4; i++) {
+    const result = matchTrayEntity(`sensor.h2d_ams_rechts_tray_${i}`);
+    if (!result) throw new Error(`Tray ${i} not detected`);
+    assertEqual(result.amsNumber, 'rechts');
+    assertEqual(result.trayNumber, i);
+  }
+});
+
+test('Somaxax H2D: "links" and "rechts" do not collide', () => {
+  const links = matchAmsHumidityEntity('sensor.h2d_ams_links_humidity');
+  const rechts = matchAmsHumidityEntity('sensor.h2d_ams_rechts_humidity');
+  if (links === rechts) throw new Error('links and rechts should have different AMS identifiers');
+});
+
+test('Somaxax H2D: External spools detected', () => {
+  assertEqual(matchExternalSpoolEntity('sensor.h2d_externalspool_external_spool'), true);
+  assertEqual(matchExternalSpoolEntity('sensor.h2d_externalspool2_external_spool'), true);
+});
+
+test('Somaxax H2D: buildTrayPattern works with non-numeric amsNumber', () => {
+  const pattern = buildTrayPattern('h2d', 'links', 1);
+  const match = 'sensor.h2d_ams_links_tray_1'.match(pattern);
+  if (!match) throw new Error('buildTrayPattern should match renamed AMS tray');
+});
+
+test('Somaxax H2D: All entities from issue #47 are discovered', () => {
+  let humidityCount = 0;
+  let trayCount = 0;
+  let externalCount = 0;
+  for (const entity of somaxaxEntities) {
+    if (matchAmsHumidityEntity(entity)) humidityCount++;
+    if (matchTrayEntity(entity)) trayCount++;
+    if (matchExternalSpoolEntity(entity)) externalCount++;
+  }
+  assertEqual(humidityCount, 2); // links + rechts
+  assertEqual(trayCount, 8); // 4 links trays + 4 rechts trays
+  assertEqual(externalCount, 2); // externalspool + externalspool2
 });
 
 // =============================================================================

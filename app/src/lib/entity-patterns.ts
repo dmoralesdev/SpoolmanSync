@@ -653,6 +653,16 @@ export function matchAmsHumidityEntity(entityId: string): string | null {
     // Return AMS number, or "lite", or default to "1" for A1 AMS Lite without explicit naming
     return match[1] || match[2] || match[3] || '1';
   }
+
+  // Catch-all: match any single alphabetic word between _ams_ and a humidity name
+  // Handles user-renamed AMS devices (e.g., ams_links_, ams_rechts_, ams_left_, ams_right_)
+  // Only reached if no specific pattern matched above
+  const catchAllPattern = new RegExp(`^sensor\\.(?:.+_)?ams_([a-z]+)_(?:${names})(?:_\\d+)?$`);
+  const catchAllMatch = entityId.match(catchAllPattern);
+  if (catchAllMatch) {
+    return catchAllMatch[1];
+  }
+
   return null;
 }
 
@@ -747,6 +757,19 @@ export function matchTrayEntity(entityId: string): { amsNumber: string; trayNumb
       trayNumber: parseInt(match[4], 10),
     };
   }
+
+  // Catch-all: match any single alphabetic word between _ams_ and a tray name
+  // Handles user-renamed AMS devices (e.g., ams_links_tray_1, ams_rechts_slot_2)
+  // Only reached if no specific pattern matched above
+  const catchAllTrayPattern = new RegExp(`^sensor\\.(?:.+_)?ams_([a-z]+)_(?:${names})_(\\d+)(?:_\\d+)?$`);
+  const catchAllTrayMatch = entityId.match(catchAllTrayPattern);
+  if (catchAllTrayMatch) {
+    return {
+      amsNumber: catchAllTrayMatch[1],
+      trayNumber: parseInt(catchAllTrayMatch[2], 10),
+    };
+  }
+
   return null;
 }
 
