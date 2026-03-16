@@ -47,14 +47,11 @@ function detectTrayMismatch(tray: HATray, assignedSpool: Spool): MismatchInfo | 
   const printerMaterial = tray.material?.toUpperCase() || '';
   const spoolMaterial = assignedSpool.filament?.material?.toUpperCase() || '';
 
-  // Material compatibility check is intentionally relaxed:
-  // 1. First try to match against the RFID/product name (e.g. "Bambu PLA Silk+")
-  //    so variants like "PLA Silk+" don't get flagged when tray.material is just "PLA".
-  // 2. If that fails, fall back to strict material-to-material comparison.
-  const normalizedTrayName = trayName.replace(/\s+/g, ' ').trim();
-  const normalizedSpoolMaterial = spoolMaterial.replace(/\s+/g, ' ').trim();
-  const materialMatchesByName =
-    normalizedTrayName && normalizedSpoolMaterial && normalizedTrayName.includes(normalizedSpoolMaterial.toLowerCase());
+  // Compare base material tokens (first word) so variants like "PLA Matte"
+  // and "PLA Silk+" are treated as compatible with "PLA", while
+  // materials like "PLA-CF" remain distinct from "PLA".
+  const basePrinterMaterial = printerMaterial.split(/\s+/)[0] || '';
+  const baseSpoolMaterial = spoolMaterial.split(/\s+/)[0] || '';
 
   // Get hex colors - RFID may have alpha channel (8 chars), Spoolman has 6 chars
   // Compare only first 6 characters (RGB, ignore alpha)
@@ -63,10 +60,9 @@ function detectTrayMismatch(tray: HATray, assignedSpool: Spool): MismatchInfo | 
 
   // Check for material mismatch
   const materialMismatch =
-    printerMaterial &&
-    spoolMaterial &&
-    !materialMatchesByName &&
-    printerMaterial !== spoolMaterial;
+    basePrinterMaterial &&
+    baseSpoolMaterial &&
+    basePrinterMaterial !== baseSpoolMaterial;
 
   // Check for color mismatch (exact match on first 6 hex chars)
   const colorMismatch = rfidColor && spoolColor && rfidColor !== spoolColor;
